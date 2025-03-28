@@ -63,7 +63,7 @@ const Index = () => {
             <div className="flex flex-col md:flex-row items-center justify-center gap-6">
               <div className="flex items-center gap-4">
                 <img src="/lovable-uploads/f8a6f77c-a25c-4c31-9106-1f3591ae2d4d.png" alt="Remāngu Logo" className="h-12 w-auto" />
-                <img src="/lovable-uploads/288103f6-b7f1-4d32-b7f2-f8d772f36d62.png" alt="AWS Logo" className="h-16 w-auto" />
+                <img src="/lovable-uploads/66074ac7-b09d-4a87-8db1-f3447c29cc00.png" alt="AWS Logo" className="h-16 w-auto" />
               </div>
               <div className="text-left">
                 <p className="text-muted-foreground mb-3">
