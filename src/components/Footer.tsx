@@ -17,31 +17,13 @@ const Footer: React.FC<FooterProps> = ({ className, ...props }) => {
         <div className="flex flex-col md:flex-row justify-between items-center">
           <div className="mb-4 md:mb-0">
             <p className="text-sm text-muted-foreground">
-              Powered by <a href="https://aws.amazon.com/gamelift/streams/" target="_blank" rel="noopener noreferrer" className="text-cyber-neon-blue hover:underline">AWS GameLift Streams</a>
+              Powered by <a href="https://aws.amazon.com/gamelift/streams/" target="_blank" rel="noopener noreferrer" className="text-cyber-neon-blue hover:underline">Amazon GameLift Streams</a>
             </p>
           </div>
           
-          <div className="flex space-x-6">
+          <div className="flex">
             <a 
-              href="https://aws.amazon.com/terms/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-xs text-muted-foreground hover:text-white transition-colors"
-            >
-              Terms of Service
-            </a>
-            <a 
-              href="https://aws.amazon.com/privacy/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-xs text-muted-foreground hover:text-white transition-colors"
-            >
-              Privacy Policy
-            </a>
-            <a 
-              href="https://aws.amazon.com/contact-us/" 
-              target="_blank" 
-              rel="noopener noreferrer"
+              href="mailto:stepan@remangu.com" 
               className="text-xs text-muted-foreground hover:text-white transition-colors"
             >
               Contact Us
@@ -51,7 +33,7 @@ const Footer: React.FC<FooterProps> = ({ className, ...props }) => {
         
         <div className="mt-6 text-center">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} PlayTest GDC. All rights reserved.
+            © {new Date().getFullYear()} Remāngu Playtest Platform. All rights reserved.
           </p>
         </div>
       </div>

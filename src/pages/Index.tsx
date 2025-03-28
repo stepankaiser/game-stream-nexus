@@ -33,7 +33,7 @@ const Index = () => {
               </div>
               <h3 className="text-xl font-bold mb-3 text-white">24-Hour Setup</h3>
               <p className="text-muted-foreground flex-1">
-                Our team will prepare the cloud streaming environment using AWS GameLift Streams technology within 24 hours.
+                Our team will prepare the cloud streaming environment using Amazon GameLift Streams technology within 24 hours.
               </p>
             </div>
             
@@ -59,12 +59,15 @@ const Index = () => {
           </div>
           
           <div className="cyber-card mt-10 p-8 border-2 border-cyber-neon-purple/30">
-            <h2 className="text-2xl font-bold mb-4 cyber-heading">Powered by AWS GameLift Streams</h2>
+            <h2 className="text-2xl font-bold mb-4 cyber-heading">Powered by Amazon GameLift Streams</h2>
             <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-              <img src="/lovable-uploads/47b0296a-0071-4b12-868b-5e0aea9cdf50.png" alt="AWS Logo" className="h-16 w-auto" />
+              <div className="flex items-center gap-4">
+                <img src="/lovable-uploads/f8a6f77c-a25c-4c31-9106-1f3591ae2d4d.png" alt="Remāngu Logo" className="h-12 w-auto" />
+                <img src="/lovable-uploads/288103f6-b7f1-4d32-b7f2-f8d772f36d62.png" alt="AWS Logo" className="h-16 w-auto" />
+              </div>
               <div className="text-left">
                 <p className="text-muted-foreground mb-3">
-                  AWS GameLift Streams provides low-latency cloud game streaming, enabling players to access games from any device without downloads.
+                  Amazon GameLift Streams provides low-latency cloud game streaming, enabling players to access games from any device without downloads.
                 </p>
                 <a 
                   href="https://aws.amazon.com/gamelift/streams/" 
@@ -72,7 +75,7 @@ const Index = () => {
                   rel="noopener noreferrer"
                   className="text-cyber-neon-blue hover:underline inline-flex items-center"
                 >
-                  Learn more about AWS GameLift Streams
+                  Learn more about Amazon GameLift Streams
                 </a>
               </div>
             </div>

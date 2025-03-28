@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import FileUpload from './FileUpload';
 import SuccessScreen from './SuccessScreen';
+import { uploadGameBuild, saveSubmission } from '@/services/supabase';
 
 // Form schema validation
 const formSchema = z.object({
@@ -32,6 +33,7 @@ const countries = [
 const PlaytestForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   // Initialize form
   const form = useForm<FormValues>({
@@ -49,12 +51,26 @@ const PlaytestForm = () => {
   // Form submission handler
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
+    setUploadProgress(0);
     
     try {
-      console.log("Form data:", data);
+      // Simulate upload progress (in a real app, you'd track actual progress)
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          const newProgress = prev + Math.random() * 10;
+          return newProgress > 90 ? 90 : newProgress;
+        });
+      }, 500);
+
+      // Upload file to Supabase Storage
+      const { filePath, fileName } = await uploadGameBuild(data.gameFile, data.email);
       
-      // Simulate API call (in a real app, this would be a fetch to your backend)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Save submission data to Supabase
+      await saveSubmission(data.email, data.country, filePath!, fileName);
+      
+      // Complete the progress bar
+      clearInterval(progressInterval);
+      setUploadProgress(100);
       
       // Show success toast
       toast.success("Game build submitted successfully!");
@@ -72,6 +88,7 @@ const PlaytestForm = () => {
   const resetForm = () => {
     form.reset();
     setIsSuccess(false);
+    setUploadProgress(0);
   };
 
   // If submission was successful, show success screen
@@ -156,6 +173,20 @@ const PlaytestForm = () => {
                 </FormItem>
               )}
             />
+            
+            {isSubmitting && uploadProgress > 0 && (
+              <div className="w-full">
+                <div className="h-2 w-full bg-cyber-dark rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-cyber-neon-purple transition-all duration-300 ease-out"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-right mt-1 text-muted-foreground">
+                  {uploadProgress < 100 ? 'Uploading...' : 'Processing...'}
+                </p>
+              </div>
+            )}
           </CardContent>
           
           <CardFooter>

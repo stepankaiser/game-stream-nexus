@@ -16,17 +16,17 @@ const Header: React.FC<HeaderProps> = ({ className, ...props }) => {
       <div className="container mx-auto px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img 
-            src="/lovable-uploads/47b0296a-0071-4b12-868b-5e0aea9cdf50.png" 
-            alt="AWS Logo" 
+            src="/lovable-uploads/f8a6f77c-a25c-4c31-9106-1f3591ae2d4d.png" 
+            alt="Remāngu Logo" 
             className="h-10 w-auto animate-float" 
           />
           <div className="ml-3">
             <h1 className="text-2xl font-bold text-white cyber-heading">
-              <span className="text-cyber-neon-blue">Play</span>
-              <span className="text-cyber-neon-purple">Test</span>
-              <span className="text-white">GDC</span>
+              <span className="text-cyber-neon-blue">Remāngu</span>
+              <span className="text-cyber-neon-purple"> Playtest</span>
+              <span className="text-white"> Platform</span>
             </h1>
-            <p className="text-xs text-muted-foreground">Powered by AWS GameLift Streams</p>
+            <p className="text-xs text-muted-foreground">Powered by Amazon GameLift Streams</p>
           </div>
         </div>
         <nav className="hidden md:flex items-center gap-8">

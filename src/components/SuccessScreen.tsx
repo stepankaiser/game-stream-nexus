@@ -32,7 +32,7 @@ const SuccessScreen: React.FC<SuccessScreenProps> = ({ email, onReset }) => {
         <div className="my-6 p-4 bg-cyber-darker/60 rounded-md border border-cyber-purple/20">
           <p className="text-sm text-muted-foreground">
             We'll send you a secure link to test your game build as soon as it's ready.
-            For any questions, please contact our support team.
+            For any questions, please contact our support team at <a href="mailto:stepan@remangu.com" className="text-cyber-neon-blue">stepan@remangu.com</a>.
           </p>
         </div>
       </div>
