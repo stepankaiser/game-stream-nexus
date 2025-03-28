@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -11,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import FileUpload from './FileUpload';
 import SuccessScreen from './SuccessScreen';
-import MissingEnvWarning from './MissingEnvWarning';
 import { uploadGameBuild, saveSubmission } from '@/services/supabase';
 
 // Form schema validation
@@ -56,17 +54,6 @@ const PlaytestForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [envVarsAvailable, setEnvVarsAvailable] = useState(true);
-  
-  useEffect(() => {
-    // Check if Supabase environment variables are available
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-      setEnvVarsAvailable(false);
-    }
-  }, []);
   
   // Initialize form
   const form = useForm<FormValues>({
@@ -83,11 +70,6 @@ const PlaytestForm = () => {
 
   // Form submission handler
   const onSubmit = async (data: FormValues) => {
-    if (!envVarsAvailable) {
-      toast.error("Cannot submit: Supabase environment variables are missing");
-      return;
-    }
-    
     setIsSubmitting(true);
     setUploadProgress(0);
     
@@ -142,8 +124,6 @@ const PlaytestForm = () => {
           Fill in the details below to start your game stream testing process
         </CardDescription>
       </CardHeader>
-      
-      {!envVarsAvailable && <CardContent><MissingEnvWarning /></CardContent>}
       
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -233,7 +213,7 @@ const PlaytestForm = () => {
             <Button 
               type="submit" 
               className="cyber-button w-full" 
-              disabled={isSubmitting || !envVarsAvailable}
+              disabled={isSubmitting}
             >
               {isSubmitting ? "Submitting..." : "Submit Game Build"}
             </Button>
