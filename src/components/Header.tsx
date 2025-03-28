@@ -16,7 +16,7 @@ const Header: React.FC<HeaderProps> = ({ className, ...props }) => {
       <div className="container mx-auto px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img 
-            src="/lovable-uploads/f8a6f77c-a25c-4c31-9106-1f3591ae2d4d.png" 
+            src="/lovable-uploads/66074ac7-b09d-4a87-8db1-f3447c29cc00.png" 
             alt="Remāngu Logo" 
             className="h-10 w-auto animate-float" 
           />
