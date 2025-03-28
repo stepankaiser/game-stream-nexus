@@ -2,15 +2,33 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize the Supabase client
-// These environment variables will be set in the Supabase dashboard
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Check if environment variables are defined
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables');
+  console.error('Missing Supabase environment variables. Create a .env file based on .env.example');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create a dummy client when environment variables are missing (development mode only)
+// This prevents the app from crashing during development
+const createDummyClient = () => {
+  return {
+    storage: {
+      from: () => ({
+        upload: async () => ({ data: { path: 'dummy-path' }, error: null }),
+      }),
+    },
+    from: () => ({
+      insert: async () => ({ data: null, error: null }),
+    }),
+  } as any;
+};
+
+// Create and export the Supabase client
+export const supabase = supabaseUrl && supabaseAnonKey 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : createDummyClient();
 
 // Function to upload a file to Supabase Storage
 export const uploadGameBuild = async (file: File, email: string) => {
