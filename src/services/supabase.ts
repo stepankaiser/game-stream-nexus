@@ -22,6 +22,8 @@ console.log("VITE_S3_BUCKET_NAME:", s3BucketName);
 console.log("VITE_AWS_ACCESS_KEY_ID:", accessKeyId ? "Loaded" : "Missing");
 console.log("VITE_AWS_SECRET_ACCESS_KEY:", secretAccessKey ? "Loaded" : "Missing");
 console.log("VITE_DYNAMODB_TABLE_NAME:", dynamoDbTableName);
+console.log("VITE_AWS_ACCESS_KEY_ID:", accessKeyId ? "Loaded" : "Missing");
+console.log("VITE_AWS_SECRET_ACCESS_KEY:", secretAccessKey ? "Loaded" : "Missing");
 
 // Basic validation - Crucial for identifying configuration issues early
 if (!region || !s3BucketName || !accessKeyId || !secretAccessKey) {
@@ -37,8 +39,16 @@ if (!region || !s3BucketName || !dynamoDbTableName || !process.env.AWS_ACCESS_KE
     // For example: throw new Error("AWS environment configuration is incomplete.");
 }
 
-// Initialize S3 Client (only if region is available)
-const s3Client = region ? new S3Client({ region }) : null;
+// Initialize S3 Client with credentials
+const s3Client = region
+    ? new S3Client({
+          region,
+          credentials: {
+              accessKeyId: accessKeyId || '',
+              secretAccessKey: secretAccessKey || '',
+          },
+      })
+    : null;
 
 // Initialize DynamoDB Client and Document Client (only if region is available)
 const ddbClient = region ? new DynamoDBClient({ region }) : null;
