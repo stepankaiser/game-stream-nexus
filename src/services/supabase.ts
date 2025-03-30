@@ -74,7 +74,7 @@ export const uploadGameBuildToS3 = async (file: File, email: string) => {
   try {
     // Create a unique file key (path within the bucket)
     const timestamp = new Date().getTime();
-    const fileExt = file.name.split('.').pop();
+    const fileExt = file.name.split('.').pop() || 'bin'; // Default to 'bin' if no extension
     const sanitizedEmail = email.replace(/[^a-zA-Z0-9]/g, '_');
     const fileName = `${sanitizedEmail}_${timestamp}.${fileExt}`;
     const fileKey = `game-builds/${fileName}`;
@@ -83,12 +83,13 @@ export const uploadGameBuildToS3 = async (file: File, email: string) => {
     console.log("File object:", file);
     console.log("File type:", file.type);
     console.log("File size:", file.size);
+    console.log("File instanceof Blob:", file instanceof Blob);
 
     // Prepare the S3 upload command parameters
     const putObjectParams = {
       Bucket: s3BucketName,
       Key: fileKey,
-      Body: file, // Ensure this is a valid Blob/File
+      Body: file instanceof Blob ? file : new Blob([file], { type: file.type || 'application/octet-stream' }),
       ContentType: file.type || 'application/octet-stream',
       CacheControl: 'max-age=3600',
     };
