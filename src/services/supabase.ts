@@ -5,6 +5,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 
+
 // --- AWS Client Initialization ---
 
 // filepath: /workspaces/game-stream-nexus/src/services/supabase.ts
@@ -85,14 +86,21 @@ export const uploadGameBuildToS3 = async (file: File, email: string) => {
     console.log("File size:", file.size);
     console.log("File instanceof Blob:", file instanceof Blob);
 
+    // Handle MIME type issues
+    const contentType = file.type === 'application/x-apple-diskimage' ? 'application/octet-stream' : file.type;
+
     // Prepare the S3 upload command parameters
     const putObjectParams = {
       Bucket: s3BucketName,
       Key: fileKey,
-      Body: file instanceof Blob ? file : new Blob([file], { type: file.type || 'application/octet-stream' }),
-      ContentType: file.type || 'application/octet-stream',
+      Body: file.stream(), // Convert File to a readable stream
+      ContentType: contentType,
       CacheControl: 'max-age=3600',
     };
+
+    // Debug the Body parameter
+    console.log("Body type:", typeof putObjectParams.Body);
+    console.log("Body instance of ReadableStream:", putObjectParams.Body instanceof ReadableStream);
 
     // Create and send the command
     const command = new PutObjectCommand(putObjectParams);
