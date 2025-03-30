@@ -68,26 +68,29 @@ const ddbDocClient = ddbClient ? DynamoDBDocumentClient.from(ddbClient, translat
 export const uploadGameBuildToS3 = async (file: File, email: string) => {
   // Ensure required config and client are available
   if (!s3Client || !s3BucketName) {
-      throw new Error("S3 client or bucket name not configured due to missing environment variables.");
+    throw new Error("S3 client or bucket name not configured due to missing environment variables.");
   }
 
   try {
-    // Create a unique file key (path within the bucket), similar to Supabase logic
+    // Create a unique file key (path within the bucket)
     const timestamp = new Date().getTime();
     const fileExt = file.name.split('.').pop();
-    // Sanitize email to make it safe for S3 key name
     const sanitizedEmail = email.replace(/[^a-zA-Z0-9]/g, '_');
     const fileName = `${sanitizedEmail}_${timestamp}.${fileExt}`;
-    // Define the key (path) within the S3 bucket (equivalent to Supabase filePath)
     const fileKey = `game-builds/${fileName}`;
+
+    // Debug the file object
+    console.log("File object:", file);
+    console.log("File type:", file.type);
+    console.log("File size:", file.size);
 
     // Prepare the S3 upload command parameters
     const putObjectParams = {
       Bucket: s3BucketName,
       Key: fileKey,
-      Body: file, // The File object can often be passed directly
-      ContentType: file.type || 'application/octet-stream', // Use file's MIME type or a default
-      CacheControl: 'max-age=3600', // Optional: Cache control header
+      Body: file, // Ensure this is a valid Blob/File
+      ContentType: file.type || 'application/octet-stream',
+      CacheControl: 'max-age=3600',
     };
 
     // Create and send the command
@@ -98,15 +101,13 @@ export const uploadGameBuildToS3 = async (file: File, email: string) => {
 
     // Return the necessary details for storing the reference in DynamoDB
     return {
-        s3Bucket: s3BucketName,
-        s3Key: fileKey,        // This is the unique identifier within the bucket (like Supabase path)
-        fileName: fileName,    // The generated file name (like Supabase fileName)
-        eTag: response.ETag    // S3's entity tag for the uploaded object version
+      s3Bucket: s3BucketName,
+      s3Key: fileKey,
+      fileName: fileName,
+      eTag: response.ETag,
     };
-
   } catch (error: any) {
     console.error('Error uploading file to S3:', error);
-    // Re-throw a more specific error for the calling code to handle
     throw new Error(`S3 Upload Failed: ${error.message || String(error)}`);
   }
 };
