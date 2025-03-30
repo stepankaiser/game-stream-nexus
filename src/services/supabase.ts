@@ -7,10 +7,28 @@ import { v4 as uuidv4 } from 'uuid';
 
 // --- AWS Client Initialization ---
 
-// Read configuration from environment variables (set via Codespaces secrets)
-const region = process.env.AWS_REGION;
-const s3BucketName = process.env.S3_BUCKET_NAME;
-const dynamoDbTableName = process.env.DYNAMODB_TABLE_NAME;
+// filepath: /workspaces/game-stream-nexus/src/services/supabase.ts
+
+// Read configuration from environment variables (set via Vite)
+const region = import.meta.env.VITE_AWS_REGION;
+const s3BucketName = import.meta.env.VITE_S3_BUCKET_NAME;
+const accessKeyId = import.meta.env.VITE_AWS_ACCESS_KEY_ID;
+const secretAccessKey = import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;
+const dynamoDbTableName = import.meta.env.VITE_DYNAMODB_TABLE_NAME;
+
+// Debug logs to verify environment variables
+console.log("VITE_AWS_REGION:", region);
+console.log("VITE_S3_BUCKET_NAME:", s3BucketName);
+console.log("VITE_AWS_ACCESS_KEY_ID:", accessKeyId ? "Loaded" : "Missing");
+console.log("VITE_AWS_SECRET_ACCESS_KEY:", secretAccessKey ? "Loaded" : "Missing");
+console.log("VITE_DYNAMODB_TABLE_NAME:", dynamoDbTableName);
+
+// Basic validation - Crucial for identifying configuration issues early
+if (!region || !s3BucketName || !accessKeyId || !secretAccessKey) {
+    console.error("AWS configuration environment variables missing. Check VITE_AWS_REGION, VITE_S3_BUCKET_NAME, VITE_AWS_ACCESS_KEY_ID, VITE_AWS_SECRET_ACCESS_KEY");
+}
+
+
 
 // Basic validation - Crucial for identifying configuration issues early
 if (!region || !s3BucketName || !dynamoDbTableName || !process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
