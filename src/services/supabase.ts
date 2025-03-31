@@ -26,6 +26,7 @@ console.log("VITE_DYNAMODB_TABLE_NAME:", dynamoDbTableName);
 console.log("VITE_AWS_ACCESS_KEY_ID:", accessKeyId ? "Loaded" : "Missing");
 console.log("VITE_AWS_SECRET_ACCESS_KEY:", secretAccessKey ? "Loaded" : "Missing");
 
+
 // Basic validation - Crucial for identifying configuration issues early
 if (!region || !s3BucketName || !accessKeyId || !secretAccessKey) {
     console.error("AWS configuration environment variables missing. Check VITE_AWS_REGION, VITE_S3_BUCKET_NAME, VITE_AWS_ACCESS_KEY_ID, VITE_AWS_SECRET_ACCESS_KEY");
@@ -86,6 +87,10 @@ export const uploadGameBuildToS3 = async (file: File, email: string) => {
     console.log("File size:", file.size);
     console.log("File instanceof Blob:", file instanceof Blob);
 
+    // Convert the File to a Buffer
+    const arrayBuffer = await file.arrayBuffer(); // Convert File to ArrayBuffer
+    const buffer = Buffer.from(arrayBuffer); // Convert ArrayBuffer to Buffer
+
     // Handle MIME type issues
     const contentType = file.type === 'application/x-apple-diskimage' ? 'application/octet-stream' : file.type;
 
@@ -93,14 +98,13 @@ export const uploadGameBuildToS3 = async (file: File, email: string) => {
     const putObjectParams = {
       Bucket: s3BucketName,
       Key: fileKey,
-      Body: file.stream(), // Convert File to a readable stream
+      Body: buffer, // Use the Buffer instead of the Blob
       ContentType: contentType,
       CacheControl: 'max-age=3600',
     };
 
     // Debug the Body parameter
     console.log("Body type:", typeof putObjectParams.Body);
-    console.log("Body instance of ReadableStream:", putObjectParams.Body instanceof ReadableStream);
 
     // Create and send the command
     const command = new PutObjectCommand(putObjectParams);
@@ -116,7 +120,7 @@ export const uploadGameBuildToS3 = async (file: File, email: string) => {
       eTag: response.ETag,
     };
   } catch (error: any) {
-    console.error('Error uploading file to S3:', error);
+    console.error("Error uploading file to S3:", error);
     throw new Error(`S3 Upload Failed: ${error.message || String(error)}`);
   }
 };
