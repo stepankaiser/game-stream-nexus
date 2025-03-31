@@ -28,6 +28,7 @@ console.log("VITE_AWS_ACCESS_KEY_ID:", accessKeyId ? "Loaded" : "Missing");
 console.log("VITE_AWS_SECRET_ACCESS_KEY:", secretAccessKey ? "Loaded" : "Missing");
 
 
+
 // Basic validation - Crucial for identifying configuration issues early
 if (!region || !s3BucketName || !accessKeyId || !secretAccessKey) {
     console.error("AWS configuration environment variables missing. Check VITE_AWS_REGION, VITE_S3_BUCKET_NAME, VITE_AWS_ACCESS_KEY_ID, VITE_AWS_SECRET_ACCESS_KEY");
@@ -54,12 +55,24 @@ const s3Client = region
     : null;
 
 // Initialize DynamoDB Client and Document Client (only if region is available)
-const ddbClient = region ? new DynamoDBClient({ region }) : null;
+const ddbClient = region
+  ? new DynamoDBClient({
+      region,
+      credentials: {
+        accessKeyId: accessKeyId || '',
+        secretAccessKey: secretAccessKey || '',
+      },
+    })
+  : null;
 const marshallOptions = { removeUndefinedValues: true }; // Remove undefined attributes during save
 const unmarshallOptions = {};
 const translateConfig = { marshallOptions, unmarshallOptions };
 // Initialize the Document Client only if the base client was initialized
 const ddbDocClient = ddbClient ? DynamoDBDocumentClient.from(ddbClient, translateConfig) : null;
+console.log("DynamoDB Client initialized:", !!ddbClient);
+console.log("DynamoDB Table Name:", dynamoDbTableName);
+console.log("AWS Access Key ID:", accessKeyId ? "Loaded" : "Missing");
+console.log("AWS Secret Access Key:", secretAccessKey ? "Loaded" : "Missing");
 
 
 // --- AWS Service Functions ---
