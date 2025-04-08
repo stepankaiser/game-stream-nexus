@@ -73,7 +73,13 @@ const PlaytestForm = () => {
   // --- CHANGE POINT 3: Update File/URL Handling ---
   // File selection handler
   const onFileSelect = (file: File | null) => { // Allow null for clearing
+    console.log("onFileSelect called with:", file); // <-- Add log
     form.setValue("gameFile", file || undefined, { shouldValidate: true });
+    console.log("form.setValue for gameFile executed. Checking form state shortly after..."); // <-- Add log
+    // Log the value right after setting it (might be slightly delayed due to async nature of state updates)
+    setTimeout(() => {
+        console.log("Form value for gameFile (delayed check):", form.getValues("gameFile"));
+    }, 100);
     if (file) {
       form.setValue("gameUrl", "", { shouldValidate: false }); // Clear URL if file is selected
     }
