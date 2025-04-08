@@ -1,6 +1,7 @@
 // src/lib/awsService.ts (or your preferred file path and name)
 
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client } from '@aws-sdk/client-s3'; // Keep S3Client
+import { Upload } from "@aws-sdk/lib-storage"; // Import Upload
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses'; // Import SES components
@@ -94,10 +95,15 @@ console.log("AWS Secret Access Key:", secretAccessKey ? "Loaded" : "Missing");
 // --- AWS Service Functions ---
 
 /**
- * Function to upload a game build file to AWS S3.
+ * Function to upload a game build file to AWS S3 using managed upload for progress.
  * Replaces the Supabase uploadGameBuild function.
+ * @param onProgress Callback function to report progress (percentage 0-100).
  */
-export const uploadGameBuildToS3 = async (file: File, email: string) => {
+export const uploadGameBuildToS3 = async (
+    file: File,
+    email: string,
+    onProgress?: (percentage: number) => void // Add optional progress callback
+) => {
   // Ensure required config and client are available
   if (!s3Client || !s3BucketName) {
     throw new Error("S3 client or bucket name not configured due to missing environment variables.");
@@ -115,39 +121,56 @@ export const uploadGameBuildToS3 = async (file: File, email: string) => {
     console.log("File object:", file);
     console.log("File type:", file.type);
     console.log("File size:", file.size);
-    console.log("File instanceof Blob:", file instanceof Blob);
+    console.log("File instanceof Blob:", file instanceof Blob); // Keep for debugging if needed
 
-    // Convert the File to a Buffer
-    const arrayBuffer = await file.arrayBuffer(); // Convert File to ArrayBuffer
-    const buffer = Buffer.from(arrayBuffer); // Convert ArrayBuffer to Buffer
+    // Handle MIME type issues (optional, but can be useful)
+    const contentType = file.type === 'application/x-apple-diskimage' ? 'application/octet-stream' : file.type || 'application/octet-stream';
 
-    // Handle MIME type issues
-    const contentType = file.type === 'application/x-apple-diskimage' ? 'application/octet-stream' : file.type;
+    // Use the Upload class from lib-storage
+    const parallelUploads3 = new Upload({
+      client: s3Client,
+      params: {
+        Bucket: s3BucketName,
+        Key: fileKey,
+        Body: file, // Pass the File object directly, lib-storage handles streaming
+        ContentType: contentType,
+        CacheControl: 'max-age=3600', // Optional: set cache control
+      },
 
-    // Prepare the S3 upload command parameters
-    const putObjectParams = {
-      Bucket: s3BucketName,
-      Key: fileKey,
-      Body: buffer, // Use the Buffer instead of the Blob
-      ContentType: contentType,
-      CacheControl: 'max-age=3600',
-    };
+      // Optional: Adjust queue size and part size for performance
+      // queueSize: 4, // Number of concurrent parts uploads
+      // partSize: 1024 * 1024 * 5, // Part size in bytes (min 5MB for S3 multipart)
 
-    // Debug the Body parameter
-    console.log("Body type:", typeof putObjectParams.Body);
+      // Enable progress reporting
+      leavePartsOnError: false, // Clean up parts on error
+    });
 
-    // Create and send the command
-    const command = new PutObjectCommand(putObjectParams);
-    const response = await s3Client.send(command);
+    parallelUploads3.on("httpUploadProgress", (progress) => {
+      if (progress.loaded && progress.total && onProgress) {
+        const percentage = Math.round((progress.loaded / progress.total) * 100);
+        onProgress(percentage);
+        console.log(`Upload Progress: ${percentage}%`); // Log progress
+      } else {
+         console.log("Upload Progress:", progress); // Log raw progress if needed
+      }
+    });
 
-    console.log(`Successfully uploaded ${fileName} to s3://${s3BucketName}/${fileKey}`);
+    // Perform the upload
+    const response = await parallelUploads3.done();
 
-    // Return the necessary details for storing the reference in DynamoDB
+    // Check the response structure from lib-storage Upload
+    // It might differ slightly from PutObjectCommand response
+    // Typically includes ETag, Location, Key, Bucket
+    console.log(`Successfully uploaded ${fileName} to s3://${s3BucketName}/${fileKey}. Response:`, response);
+
+    // Return the necessary details
     return {
       s3Bucket: s3BucketName,
       s3Key: fileKey,
       fileName: fileName,
+      // ETag might be nested differently, adjust if needed based on 'response' structure
       eTag: response.ETag,
+      location: response.Location, // Location URL might also be useful
     };
   } catch (error: any) {
     console.error("Error uploading file to S3:", error);

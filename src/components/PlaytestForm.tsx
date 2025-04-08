@@ -140,20 +140,23 @@ const PlaytestForm = () => {
         // data.gameFile is guaranteed to be a File here by the schema
         console.log("Processing file upload for:", data.gameFile.name);
 
-        // Simulate upload progress
-        const progressInterval = setInterval(() => {
-          setUploadProgress(prev => {
-            const newProgress = prev + Math.random() * 10;
-            return newProgress > 90 ? 90 : newProgress; // Cap simulation
-          });
-        }, 500);
+        // Remove simulation interval
+        // const progressInterval = setInterval(() => { ... });
 
         console.log('Uploading to S3...');
-        const uploadResult = await uploadGameBuildToS3(data.gameFile, data.email);
+        // Pass setUploadProgress as the onProgress callback
+        const uploadResult = await uploadGameBuildToS3(
+            data.gameFile,
+            data.email,
+            setUploadProgress // Pass the state setter directly
+        );
         console.log('S3 Upload Result:', uploadResult);
 
-        clearInterval(progressInterval); // Stop simulation after upload
-        setUploadProgress(100); // Mark as complete
+        // No need to clear interval or manually set to 100,
+        // onProgress callback handles intermediate states,
+        // and completion is implied by await finishing.
+        // Consider setting to 100 explicitly *after* await if needed for UI final state.
+        setUploadProgress(100); // Explicitly set to 100 after upload completes
 
         s3Bucket = uploadResult.s3Bucket;
         s3Key = uploadResult.s3Key;
