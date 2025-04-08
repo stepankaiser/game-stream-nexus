@@ -2,7 +2,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-interface HeaderProps extends React.HTMLAttributes<HTMLDivElement> {}
+type HeaderProps = React.HTMLAttributes<HTMLDivElement>;
 
 const Header: React.FC<HeaderProps> = ({ className, ...props }) => {
   return (

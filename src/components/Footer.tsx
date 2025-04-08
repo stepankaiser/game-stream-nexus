@@ -2,7 +2,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
-interface FooterProps extends React.HTMLAttributes<HTMLDivElement> {}
+type FooterProps = React.HTMLAttributes<HTMLDivElement>;
 
 const Footer: React.FC<FooterProps> = ({ className, ...props }) => {
   return (

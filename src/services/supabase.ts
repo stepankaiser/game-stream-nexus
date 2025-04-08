@@ -172,9 +172,10 @@ export const uploadGameBuildToS3 = async (
       eTag: response.ETag,
       location: response.Location, // Location URL might also be useful
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error uploading file to S3:", error);
-    throw new Error(`S3 Upload Failed: ${error.message || String(error)}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`S3 Upload Failed: ${errorMessage}`);
   }
 };
 
@@ -253,10 +254,11 @@ export const saveSubmissionToDynamoDB = async (
         itemData: itemToSave // Return the saved item data for potential use in UI
     };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error saving submission to DynamoDB:', error);
     // Re-throw a more specific error
-    throw new Error(`DynamoDB Save Failed: ${error.message || String(error)}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`DynamoDB Save Failed: ${errorMessage}`);
   }
 };
 
@@ -344,11 +346,12 @@ export const sendConfirmationEmail = async (
         const command = new SendEmailCommand(params);
         const response = await sesClient.send(command); // Capture response
         console.log(`Confirmation email successfully sent to ${recipientEmail}. SES Response:`, JSON.stringify(response, null, 2)); // Log success response
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`Error sending confirmation email via SES to ${recipientEmail}. Params Sent:`, JSON.stringify(params, null, 2)); // Log params on error
         console.error("Full SES Error:", error); // Log the full error object
         // Decide how to handle email failure - log, maybe notify admin, but likely don't fail the whole submission
-        // throw new Error(`SES Email Send Failed: ${error.message || String(error)}`);
+        // const errorMessage = error instanceof Error ? error.message : String(error);
+        // throw new Error(`SES Email Send Failed: ${errorMessage}`);
     }
 };
 

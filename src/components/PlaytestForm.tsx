@@ -202,9 +202,11 @@ const PlaytestForm = () => {
       toast.success("Game build submitted successfully!");
       setIsSuccess(true);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error submitting form:", error);
-      toast.error(`Submission failed: ${error.message || 'Please try again.'}`);
+      // Type check before accessing message property
+      const errorMessage = error instanceof Error ? error.message : 'Please try again.';
+      toast.error(`Submission failed: ${errorMessage}`);
       setUploadProgress(0); // Reset progress on error
     } finally {
       setIsSubmitting(false);
@@ -391,9 +393,14 @@ const PlaytestForm = () => {
                      style={{ width: `${uploadProgress}%` }}
                    />
                  </div>
-                 <p className="text-xs text-right mt-1 text-muted-foreground">
-                   {uploadProgress < 100 ? 'Uploading...' : 'Processing...'}
-                 </p>
+                 <div className="flex justify-between items-center mt-1">
+                   <p className="text-xs text-muted-foreground">
+                     {uploadProgress < 100 ? 'Uploading...' : 'Processing...'}
+                   </p>
+                   <p className="text-xs font-medium">
+                     {uploadProgress < 100 ? `${Math.round(uploadProgress)}%` : 'Complete'}
+                   </p>
+                 </div>
                </div>
              )}
            </CardContent>
