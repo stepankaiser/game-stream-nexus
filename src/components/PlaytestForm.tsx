@@ -1,6 +1,6 @@
 // src/components/PlaytestForm.tsx (or your actual path)
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Import useEffect
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form"; // Import Controller
 import { z } from "zod";
@@ -69,6 +69,18 @@ const PlaytestForm = () => {
       gameUrl: "",
     }
   });
+
+  // --- Add useEffect to log form state changes ---
+  useEffect(() => {
+    const subscription = form.watch((value, { name, type }) => {
+      console.log("Form value changed:", name, type, value);
+      console.log("Current form errors:", form.formState.errors);
+      console.log("Is form valid?:", form.formState.isValid);
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+  // --- End of useEffect ---
+
 
   // --- CHANGE POINT 3: Update File/URL Handling ---
   // File selection handler
