@@ -18,14 +18,35 @@ import SuccessScreen from './SuccessScreen';
 // Import the NEW AWS service functions including the email function
 import { uploadGameBuildToS3, saveSubmissionToDynamoDB, sendConfirmationEmail } from '@/services/supabase';
 
-// --- CHANGE POINT 1: Update the Form Schema ---
-const formSchema = z.object({
+// --- CHANGE POINT 1: Update the Form Schema using discriminatedUnion ---
+const baseSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
-  country: z.string({ required_error: "Please select your country" }),
-  submissionType: z.enum(['upload', 'url']).default('upload'), // Add submission type
-  gameFile: z.any().optional(), // <-- Change to z.any() to bypass Zod File validation
-  gameUrl: z.string().url({ message: "Please enter a valid URL" }).optional(), // Add optional URL field
-}); // <-- Keep .refine() removed for now
+  country: z.string().min(1, { message: "Please select your country" }), // Use min(1) for required string
+});
+
+const formSchema = z.discriminatedUnion("submissionType", [
+  // Schema when submissionType is 'upload'
+  baseSchema.extend({
+    submissionType: z.literal('upload'),
+    gameFile: z.instanceof(File, { message: "Please upload your game build file." }),
+    gameUrl: z.string().optional(), // Keep optional if needed, but not required here
+  }),
+  // Schema when submissionType is 'url'
+  baseSchema.extend({
+    submissionType: z.literal('url'),
+    gameUrl: z.string().url({ message: "Please enter a valid URL." }),
+    gameFile: z.any().optional(), // Keep optional if needed, but not required here
+  }),
+], {
+    // Error message if neither schema matches (e.g., invalid submissionType)
+    errorMap: (issue, ctx) => {
+        if (issue.code === "invalid_union_discriminator") {
+            return { message: "Invalid submission type selected." };
+        }
+        // Use default error message for other issues
+        return { message: ctx.defaultError };
+    }
+});
 
 
 type FormValues = z.infer<typeof formSchema>;
@@ -47,13 +68,15 @@ const PlaytestForm = () => {
   // --- CHANGE POINT 2: Update Form Initialization ---
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
+    // Default values should match one of the union types
     defaultValues: {
       email: "",
       country: "",
       submissionType: 'upload', // Default to upload
-      gameFile: undefined,
-      gameUrl: "",
-    }
+      gameFile: undefined, // Will be validated by the 'upload' schema part
+      gameUrl: "",         // Will be validated by the 'url' schema part
+    },
+    mode: "onChange", // Trigger validation more frequently for better UX/debugging
   });
 
   // --- Add useEffect to log form state changes ---
@@ -112,15 +135,10 @@ const PlaytestForm = () => {
       let gameBuildUrl: string | undefined = undefined;
 
       // --- Step 1: Handle Upload or URL ---
+      // Manual check is no longer needed as discriminatedUnion handles it
       if (data.submissionType === 'upload') {
-        // --- Add manual File check ---
-        if (!(data.gameFile instanceof File)) {
-            console.error("Form submitted with upload type but gameFile is not a File:", data.gameFile);
-            toast.error("Invalid game file. Please re-upload.");
-            setIsSubmitting(false); // Reset submitting state
-            return; // Stop submission
-        }
-        // --- End manual File check ---
+        // data.gameFile is guaranteed to be a File here by the schema
+        console.log("Processing file upload for:", data.gameFile.name);
 
         // Simulate upload progress
         const progressInterval = setInterval(() => {
@@ -141,15 +159,14 @@ const PlaytestForm = () => {
         s3Key = uploadResult.s3Key;
         fileName = uploadResult.fileName;
 
-      } else if (data.submissionType === 'url' && data.gameUrl) {
+      } else if (data.submissionType === 'url') {
+        // data.gameUrl is guaranteed to be a valid URL string here by the schema
         console.log('Using provided URL:', data.gameUrl);
         gameBuildUrl = data.gameUrl;
         // No S3 upload, no progress simulation needed for URL
         setUploadProgress(100); // Indicate processing complete immediately
-      } else {
-        // This case should ideally be caught by Zod refinement, but good to handle
-        throw new Error("Invalid submission data. No file or URL provided.");
       }
+      // No 'else' needed as the discriminated union ensures one case matches if valid
 
       // --- Step 2: Save submission data to AWS DynamoDB ---
       // NOTE: saveSubmissionToDynamoDB now handles optional S3/URL details
