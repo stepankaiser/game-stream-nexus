@@ -90,10 +90,16 @@ const PlaytestForm = () => {
 
   // --- CHANGE POINT 4: Update onSubmit Logic ---
   const onSubmit = async (data: FormValues) => {
+    console.log("onSubmit triggered!"); // <-- Add this log
+    console.log("Form data received:", data); // <-- Add this log
+
     setIsSubmitting(true);
     setUploadProgress(0);
 
     // Zod schema refinement handles the core validation now
+    // Let's log the validation result explicitly for debugging
+    const validation = formSchema.safeParse(data);
+    console.log("Zod validation result:", validation); // <-- Add this log
 
     try {
       let s3Bucket: string | undefined = undefined;
