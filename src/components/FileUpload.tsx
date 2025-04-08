@@ -8,14 +8,12 @@ interface FileUploadProps {
   onFileSelect: (file: File) => void;
   className?: string;
   acceptedFileTypes?: string;
-  maxFileSizeMB?: number;
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   className,
-  acceptedFileTypes = ".zip,.rar,.7z,.exe,.dmg",
-  maxFileSizeMB = 2000 // 2GB max size
+  acceptedFileTypes = ".zip,.rar,.7z,.exe,.dmg"
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -31,12 +29,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   const validateAndSetFile = (file: File) => {
     setError(null);
-
-    // Check file size
-    if (file.size > maxFileSizeMB * 1024 * 1024) {
-      setError(`File size exceeds the maximum limit of ${maxFileSizeMB}MB`);
-      return;
-    }
 
     // Check file type if acceptedFileTypes is provided
     if (acceptedFileTypes && acceptedFileTypes !== "*") {
@@ -159,7 +151,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
               Drag and drop your game build here or click to browse
             </p>
             <p className="text-muted-foreground text-sm mt-1">
-              Accepted formats: .zip, .rar, .7z, .exe, .dmg (Max: {maxFileSizeMB}MB)
+              Accepted formats: .zip, .rar, .7z, .exe, .dmg
             </p>
           </div>
         )}

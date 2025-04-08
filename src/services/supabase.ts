@@ -3,6 +3,7 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses'; // Import SES components
 import { v4 as uuidv4 } from 'uuid';
 import { Buffer } from 'buffer';
 
@@ -17,6 +18,7 @@ const s3BucketName = import.meta.env.VITE_S3_BUCKET_NAME;
 const accessKeyId = import.meta.env.VITE_AWS_ACCESS_KEY_ID;
 const secretAccessKey = import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;
 const dynamoDbTableName = import.meta.env.VITE_DYNAMODB_TABLE_NAME;
+const sesSenderEmail = import.meta.env.VITE_SES_SENDER_EMAIL; // Read SES sender email
 
 // Debug logs to verify environment variables
 console.log("VITE_AWS_REGION:", region);
@@ -24,14 +26,15 @@ console.log("VITE_S3_BUCKET_NAME:", s3BucketName);
 console.log("VITE_AWS_ACCESS_KEY_ID:", accessKeyId ? "Loaded" : "Missing");
 console.log("VITE_AWS_SECRET_ACCESS_KEY:", secretAccessKey ? "Loaded" : "Missing");
 console.log("VITE_DYNAMODB_TABLE_NAME:", dynamoDbTableName);
+console.log("VITE_SES_SENDER_EMAIL:", sesSenderEmail); // Log SES sender email
 console.log("VITE_AWS_ACCESS_KEY_ID:", accessKeyId ? "Loaded" : "Missing");
 console.log("VITE_AWS_SECRET_ACCESS_KEY:", secretAccessKey ? "Loaded" : "Missing");
 
 
 
 // Basic validation - Crucial for identifying configuration issues early
-if (!region || !s3BucketName || !accessKeyId || !secretAccessKey) {
-    console.error("AWS configuration environment variables missing. Check VITE_AWS_REGION, VITE_S3_BUCKET_NAME, VITE_AWS_ACCESS_KEY_ID, VITE_AWS_SECRET_ACCESS_KEY");
+if (!region || !s3BucketName || !accessKeyId || !secretAccessKey || !sesSenderEmail) {
+    console.error("AWS configuration environment variables missing. Check VITE_AWS_REGION, VITE_S3_BUCKET_NAME, VITE_AWS_ACCESS_KEY_ID, VITE_AWS_SECRET_ACCESS_KEY, VITE_SES_SENDER_EMAIL");
 }
 
 
@@ -69,7 +72,20 @@ const unmarshallOptions = {};
 const translateConfig = { marshallOptions, unmarshallOptions };
 // Initialize the Document Client only if the base client was initialized
 const ddbDocClient = ddbClient ? DynamoDBDocumentClient.from(ddbClient, translateConfig) : null;
+
+// Initialize SES Client (only if region and credentials are available)
+const sesClient = region && accessKeyId && secretAccessKey
+  ? new SESClient({
+      region,
+      credentials: {
+        accessKeyId: accessKeyId,
+        secretAccessKey: secretAccessKey,
+      },
+    })
+  : null;
+
 console.log("DynamoDB Client initialized:", !!ddbClient);
+console.log("SES Client initialized:", !!sesClient); // Log SES client status
 console.log("DynamoDB Table Name:", dynamoDbTableName);
 console.log("AWS Access Key ID:", accessKeyId ? "Loaded" : "Missing");
 console.log("AWS Secret Access Key:", secretAccessKey ? "Loaded" : "Missing");
@@ -146,9 +162,10 @@ export const uploadGameBuildToS3 = async (file: File, email: string) => {
 export const saveSubmissionToDynamoDB = async (
   email: string,
   country: string,
-  s3Bucket: string, // Passed from the S3 upload result
-  s3Key: string,    // Passed from the S3 upload result (replaces filePath)
-  originalOrUploadedFileName: string // Passed from upload result or original file (replaces fileName)
+  s3Bucket?: string, // Optional: Passed from S3 upload
+  s3Key?: string,    // Optional: Passed from S3 upload
+  originalOrUploadedFileName?: string, // Optional: Passed from S3 upload
+  gameBuildUrl?: string // Optional: Passed if URL submission
 ) => {
   // Ensure required config and client are available
   if (!ddbDocClient || !dynamoDbTableName) {
@@ -161,21 +178,37 @@ export const saveSubmissionToDynamoDB = async (
     const submittedAt = new Date().toISOString();
 
     // Prepare the item structure for DynamoDB
-    // Note the mapping from old Supabase fields to new structure:
-    // - file_path -> s3Key (primary identifier)
-    // - file_name -> originalOrUploadedFileName (descriptive name)
-    // - Added submissionId (primary key), s3Bucket, submittedAt
-    const itemToSave = {
-      submissionId: submissionId,        // Primary Key for DynamoDB table
+    // Determine submission type based on provided arguments
+    const submissionType = gameBuildUrl ? 'url' : 'upload';
+
+    // Prepare the item structure for DynamoDB
+    const itemToSave: { [key: string]: any } = { // Use index signature for flexibility
+      submissionId: submissionId,        // Primary Key
       email: email,
       country: country,
-      s3Bucket: s3Bucket,              // Store the bucket name
-      s3Key: s3Key,                    // Store the S3 object key (path)
-      originalFileName: originalOrUploadedFileName, // Store the file name
-      status: 'pending',               // Set initial status
-      submittedAt: submittedAt,          // Timestamp for submission
-      // Add any other fields that were in your Supabase 'submissions' table
+      submissionType: submissionType,    // Store how it was submitted
+      status: 'pending',               // Initial status
+      submittedAt: submittedAt,          // Timestamp
+      // Conditionally add S3 details or URL
+      ...(submissionType === 'upload' && s3Bucket && s3Key && originalOrUploadedFileName && {
+        s3Bucket: s3Bucket,
+        s3Key: s3Key,
+        originalFileName: originalOrUploadedFileName,
+      }),
+      ...(submissionType === 'url' && gameBuildUrl && {
+        gameBuildUrl: gameBuildUrl,
+      }),
+      // Add any other common fields
     };
+
+    // Validate that we have the necessary data for the determined type
+    if (submissionType === 'upload' && (!s3Bucket || !s3Key || !originalOrUploadedFileName)) {
+        throw new Error("Missing S3 details for upload submission type.");
+    }
+    if (submissionType === 'url' && !gameBuildUrl) {
+        throw new Error("Missing URL for url submission type.");
+    }
+
 
     // Prepare the DynamoDB Put command parameters
     const params = {
@@ -204,6 +237,75 @@ export const saveSubmissionToDynamoDB = async (
   }
 };
 
+
+/**
+ * Function to send a confirmation email using AWS SES.
+ */
+export const sendConfirmationEmail = async (
+    recipientEmail: string,
+    submissionId: string,
+    submissionType: 'upload' | 'url',
+    details: { fileName?: string; gameBuildUrl?: string }
+) => {
+    // Ensure required config and client are available
+    if (!sesClient || !sesSenderEmail) {
+        console.error("SES client or sender email not configured. Skipping email.");
+        // Decide if you want to throw an error or just log and continue
+        // throw new Error("SES client or sender email not configured due to missing environment variables.");
+        return; // Silently fail if not configured
+    }
+
+    const subject = "Game Build Submission Received";
+    let bodyText = `Hello,\n\nThank you for submitting your game build.\n\nSubmission ID: ${submissionId}\n`;
+    let bodyHtml = `<p>Hello,</p><p>Thank you for submitting your game build.</p><p><strong>Submission ID:</strong> ${submissionId}</p>`;
+
+    if (submissionType === 'upload' && details.fileName) {
+        bodyText += `Uploaded File: ${details.fileName}\n`;
+        bodyHtml += `<p><strong>Uploaded File:</strong> ${details.fileName}</p>`;
+    } else if (submissionType === 'url' && details.gameBuildUrl) {
+        bodyText += `Submitted URL: ${details.gameBuildUrl}\n`;
+        bodyHtml += `<p><strong>Submitted URL:</strong> ${details.gameBuildUrl}</p>`;
+    }
+
+    bodyText += "\nWe will review it shortly.\n\nBest regards,\nYour Game Team";
+    bodyHtml += "<p>We will review it shortly.</p><p>Best regards,<br>Your Game Team</p>";
+
+    const params = {
+        Source: sesSenderEmail, // The verified 'From' address
+        Destination: {
+            ToAddresses: [recipientEmail], // The user's email
+        },
+        Message: {
+            Subject: {
+                Data: subject,
+                Charset: 'UTF-8',
+            },
+            Body: {
+                Text: {
+                    Data: bodyText,
+                    Charset: 'UTF-8',
+                },
+                Html: {
+                    Data: bodyHtml,
+                    Charset: 'UTF-8',
+                },
+            },
+        },
+        // Optional: ConfigurationSetName for tracking, ReplyToAddresses, etc.
+    };
+
+    try {
+        const command = new SendEmailCommand(params);
+        await sesClient.send(command);
+        console.log(`Confirmation email successfully sent to ${recipientEmail}`);
+    } catch (error: any) {
+        console.error(`Error sending confirmation email via SES to ${recipientEmail}:`, error);
+        // Decide how to handle email failure - log, maybe notify admin, but likely don't fail the whole submission
+        // throw new Error(`SES Email Send Failed: ${error.message || String(error)}`);
+    }
+};
+
+
 // You can also export the raw clients or config if needed elsewhere, but it's often cleaner
 // to just export the functions that use them, like above.
-// export { s3Client, ddbDocClient, s3BucketName, dynamoDbTableName };
+// export { s3Client, ddbDocClient, sesClient, s3BucketName, dynamoDbTableName, sesSenderEmail };
