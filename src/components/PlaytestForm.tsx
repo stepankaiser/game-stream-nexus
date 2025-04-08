@@ -23,9 +23,9 @@ const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
   country: z.string({ required_error: "Please select your country" }),
   submissionType: z.enum(['upload', 'url']).default('upload'), // Add submission type
-  gameFile: z.instanceof(File).optional(), // Make file optional
+  gameFile: z.any().optional(), // <-- Change to z.any() to bypass Zod File validation
   gameUrl: z.string().url({ message: "Please enter a valid URL" }).optional(), // Add optional URL field
-}); // <-- Temporarily remove the .refine() block
+}); // <-- Keep .refine() removed for now
 
 
 type FormValues = z.infer<typeof formSchema>;
@@ -112,7 +112,16 @@ const PlaytestForm = () => {
       let gameBuildUrl: string | undefined = undefined;
 
       // --- Step 1: Handle Upload or URL ---
-      if (data.submissionType === 'upload' && data.gameFile) {
+      if (data.submissionType === 'upload') {
+        // --- Add manual File check ---
+        if (!(data.gameFile instanceof File)) {
+            console.error("Form submitted with upload type but gameFile is not a File:", data.gameFile);
+            toast.error("Invalid game file. Please re-upload.");
+            setIsSubmitting(false); // Reset submitting state
+            return; // Stop submission
+        }
+        // --- End manual File check ---
+
         // Simulate upload progress
         const progressInterval = setInterval(() => {
           setUploadProgress(prev => {
@@ -347,8 +356,7 @@ const PlaytestForm = () => {
                         </TabsContent>
                       </Tabs>
                     </FormControl>
-                    {/* Display the combined error message from the refinement */}
-                    <FormMessage>{form.formState.errors.gameFile?.message}</FormMessage>
+                    {/* Removed redundant FormMessage here, errors are handled within field controls */}
                   </FormItem>
                 )}
               />
