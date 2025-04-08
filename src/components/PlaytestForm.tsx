@@ -26,6 +26,7 @@ const formSchema = z.object({
   gameFile: z.instanceof(File).optional(), // Make file optional
   gameUrl: z.string().url({ message: "Please enter a valid URL" }).optional(), // Add optional URL field
 }).refine(data => {
+  console.log("Refine check running. Data:", data); // Log data
   // Ensure either file is provided for 'upload' or URL for 'url'
   if (data.submissionType === 'upload') {
     return !!data.gameFile;
@@ -38,7 +39,7 @@ const formSchema = z.object({
   // Custom error message if validation fails
   message: "Please provide either a game build file or a valid URL.",
   // Specify the path to associate the error with (optional, can target a specific field)
-  path: ["gameFile"], // Or ["gameUrl"] or a more general path
+  // path: ["gameFile"], // Remove specific path for the refinement error
 });
 
 
