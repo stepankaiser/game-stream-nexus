@@ -128,13 +128,13 @@ export const uploadGameBuildToS3 = async (
     const putObjectParams = {
         Bucket: s3BucketName,
         Key: fileKey,
-        Body: file,
+        Body: file.stream(), // Use the file's ReadableStream
         ContentType: contentType,
         CacheControl: 'max-age=3600', // Optional: set cache control
         ChecksumAlgorithm: undefined, // Explicitly disable client-side checksum calculation
     };
 
-    console.log(`Attempting to upload ${fileName} using PutObjectCommand...`);
+    console.log(`Attempting to upload ${fileName} using PutObjectCommand with file stream...`);
     const command = new PutObjectCommand(putObjectParams);
     const response = await s3Client.send(command); // Send the command
 
