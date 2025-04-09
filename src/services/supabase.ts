@@ -314,7 +314,7 @@ export const sendConfirmationEmail = async (
     bodyHtml += `<li style="margin-bottom: 10px;"><strong>Play & Evaluate:</strong><br>Experience your game through cloud streaming and evaluate if this technology fits your needs and use cases.</li>`;
     bodyHtml += `</ol>`;
     bodyHtml += `<p>If you have any questions in the meantime, please don't hesitate to contact us at <a href="mailto:stepan@remangu.com">stepan@remangu.com</a>.</p>`; // Corrected email address
-    bodyHtml += `<p>Best regards,<br>The Team</p>`;
+    bodyHtml += `<p>Best regards,<br>The Remangu Team</p>`;
     // --- End of Updated Email Content ---
 
 
