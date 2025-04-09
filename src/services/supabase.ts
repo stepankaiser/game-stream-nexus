@@ -248,6 +248,17 @@ export const saveSubmissionToDynamoDB = async (
 
     console.log('Successfully saved submission to DynamoDB:', submissionId);
 
+    // --- ADDED: Send Admin Notification Email ---
+    try {
+        await sendAdminNotificationEmail(itemToSave);
+        console.log(`Admin notification email sent for submission ${submissionId}.`);
+    } catch (adminEmailError) {
+        console.error(`Failed to send admin notification email for submission ${submissionId}:`, adminEmailError);
+        // Continue even if admin email fails
+    }
+    // --- END ADDED ---
+
+
     // Return confirmation and the data that was intended to be saved
     return {
         success: true,
@@ -355,6 +366,90 @@ export const sendConfirmationEmail = async (
         // throw new Error(`SES Email Send Failed: ${errorMessage}`);
     }
 };
+
+
+// --- ADDED: Admin Notification Email Function ---
+/**
+ * Function to send an admin notification email about a new submission.
+ */
+const sendAdminNotificationEmail = async (submissionData: { [key: string]: any }) => {
+    const adminEmail = "stepan@remangu.com"; // Admin email address
+
+    // Ensure SES client and sender email are configured
+    if (!sesClient || !sesSenderEmail) {
+        console.error("SES client or sender email not configured. Skipping admin notification email.");
+        return; // Silently fail if not configured
+    }
+
+    const subject = `New Game Build Submission Received (ID: ${submissionData.submissionId})`;
+
+    // Construct email body with submission details
+    let bodyText = `A new game build submission has been received:\\n\\n`;
+    bodyText += `Submission ID: ${submissionData.submissionId}\\n`;
+    bodyText += `Submitted At: ${new Date(submissionData.submittedAt).toLocaleString()}\\n`;
+    bodyText += `Submitter Email: ${submissionData.email}\\n`;
+    bodyText += `Country: ${submissionData.country}\\n`;
+    bodyText += `Submission Type: ${submissionData.submissionType}\\n`;
+
+    if (submissionData.submissionType === 'upload') {
+        bodyText += `Original File Name: ${submissionData.originalFileName}\\n`;
+        bodyText += `S3 Bucket: ${submissionData.s3Bucket}\\n`;
+        bodyText += `S3 Key: ${submissionData.s3Key}\\n`;
+    } else if (submissionData.submissionType === 'url') {
+        bodyText += `Submitted URL: ${submissionData.gameBuildUrl}\\n`;
+    }
+
+    bodyText += `\\nStatus: ${submissionData.status}\\n`;
+    bodyText += `\\nPlease review the submission in the system.\\n`;
+
+
+    let bodyHtml = `<p>A new game build submission has been received:</p>`;
+    bodyHtml += `<ul>`;
+    bodyHtml += `<li><strong>Submission ID:</strong> ${submissionData.submissionId}</li>`;
+    bodyHtml += `<li><strong>Submitted At:</strong> ${new Date(submissionData.submittedAt).toLocaleString()}</li>`;
+    bodyHtml += `<li><strong>Submitter Email:</strong> ${submissionData.email}</li>`;
+    bodyHtml += `<li><strong>Country:</strong> ${submissionData.country}</li>`;
+    bodyHtml += `<li><strong>Submission Type:</strong> ${submissionData.submissionType}</li>`;
+
+    if (submissionData.submissionType === 'upload') {
+        bodyHtml += `<li><strong>Original File Name:</strong> ${submissionData.originalFileName}</li>`;
+        bodyHtml += `<li><strong>S3 Bucket:</strong> ${submissionData.s3Bucket}</li>`;
+        bodyHtml += `<li><strong>S3 Key:</strong> ${submissionData.s3Key}</li>`;
+    } else if (submissionData.submissionType === 'url') {
+        bodyHtml += `<li><strong>Submitted URL:</strong> <a href="${submissionData.gameBuildUrl}">${submissionData.gameBuildUrl}</a></li>`;
+    }
+
+    bodyHtml += `<li><strong>Status:</strong> ${submissionData.status}</li>`;
+    bodyHtml += `</ul>`;
+    bodyHtml += `<p>Please review the submission in the system.</p>`;
+
+
+    const params = {
+        Source: sesSenderEmail,
+        Destination: {
+            ToAddresses: [adminEmail],
+        },
+        Message: {
+            Subject: { Data: subject, Charset: 'UTF-8' },
+            Body: {
+                Text: { Data: bodyText, Charset: 'UTF-8' },
+                Html: { Data: bodyHtml, Charset: 'UTF-8' },
+            },
+        },
+    };
+
+    try {
+        console.log(`Attempting to send admin notification email to ${adminEmail} for submission ${submissionData.submissionId}`);
+        const command = new SendEmailCommand(params);
+        await sesClient.send(command);
+        console.log(`Admin notification email successfully sent for submission ${submissionData.submissionId}.`);
+    } catch (error: unknown) {
+        console.error(`Error sending admin notification email via SES for submission ${submissionData.submissionId}:`, error);
+        // Re-throw or handle as needed, but currently logged above where called
+        throw error; // Re-throw to be caught by the caller
+    }
+};
+// --- END ADDED ---
 
 
 // You can also export the raw clients or config if needed elsewhere, but it's often cleaner
