@@ -135,7 +135,6 @@ export const uploadGameBuildToS3 = async (
         Body: file, // Pass the File object directly, lib-storage handles streaming
         ContentType: contentType,
         CacheControl: 'max-age=3600', // Optional: set cache control
-        ChecksumAlgorithm: undefined // Explicitly disable client-side checksum algorithm
       },
 
       // Optional: Adjust queue size and part size for performance
