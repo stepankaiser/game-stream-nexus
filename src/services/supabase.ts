@@ -1,6 +1,7 @@
 // src/lib/awsService.ts (or your preferred file path and name)
 
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'; // Use PutObjectCommand
+import { XhrHttpHandler } from '@aws-sdk/xhr-http-handler'; // Import the XHR handler
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses'; // Import SES components
@@ -46,10 +47,11 @@ if (!region || !s3BucketName || !dynamoDbTableName || !process.env.AWS_ACCESS_KE
     // For example: throw new Error("AWS environment configuration is incomplete.");
 }
 
-// Initialize S3 Client with credentials
+// Initialize S3 Client with credentials and the XHR handler
 const s3Client = region
     ? new S3Client({
           region,
+          requestHandler: new XhrHttpHandler(), // Use XHR handler
           credentials: {
               accessKeyId: accessKeyId || '',
               secretAccessKey: secretAccessKey || '',
