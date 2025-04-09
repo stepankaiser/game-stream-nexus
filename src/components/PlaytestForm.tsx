@@ -62,7 +62,6 @@ const countries = [
 const PlaytestForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0); // Keep for upload simulation
   const [submissionType, setSubmissionType] = useState<'upload' | 'url'>('upload'); // State for tabs
 
   // --- CHANGE POINT 2: Update Form Initialization ---
@@ -118,10 +117,9 @@ const PlaytestForm = () => {
   // --- CHANGE POINT 4: Update onSubmit Logic ---
   const onSubmit = async (data: FormValues) => {
     console.log("onSubmit triggered!"); // <-- Add this log
-    console.log("Form data received:", data); // <-- Add this log
+    console.log("Form data received:", data);
 
     setIsSubmitting(true);
-    setUploadProgress(0);
 
     // Zod schema refinement handles the core validation now
     // Let's log the validation result explicitly for debugging
@@ -140,23 +138,12 @@ const PlaytestForm = () => {
         // data.gameFile is guaranteed to be a File here by the schema
         console.log("Processing file upload for:", data.gameFile.name);
 
-        // Remove simulation interval
-        // const progressInterval = setInterval(() => { ... });
-
         console.log('Uploading to S3...');
-        // Pass setUploadProgress as the onProgress callback
         const uploadResult = await uploadGameBuildToS3(
             data.gameFile,
-            data.email,
-            setUploadProgress // Pass the state setter directly
+            data.email
         );
         console.log('S3 Upload Result:', uploadResult);
-
-        // No need to clear interval or manually set to 100,
-        // onProgress callback handles intermediate states,
-        // and completion is implied by await finishing.
-        // Consider setting to 100 explicitly *after* await if needed for UI final state.
-        setUploadProgress(100); // Explicitly set to 100 after upload completes
 
         s3Bucket = uploadResult.s3Bucket;
         s3Key = uploadResult.s3Key;
@@ -166,8 +153,6 @@ const PlaytestForm = () => {
         // data.gameUrl is guaranteed to be a valid URL string here by the schema
         console.log('Using provided URL:', data.gameUrl);
         gameBuildUrl = data.gameUrl;
-        // No S3 upload, no progress simulation needed for URL
-        setUploadProgress(100); // Indicate processing complete immediately
       }
       // No 'else' needed as the discriminated union ensures one case matches if valid
 
@@ -207,7 +192,6 @@ const PlaytestForm = () => {
       // Type check before accessing message property
       const errorMessage = error instanceof Error ? error.message : 'Please try again.';
       toast.error(`Submission failed: ${errorMessage}`);
-      setUploadProgress(0); // Reset progress on error
     } finally {
       setIsSubmitting(false);
     }
@@ -225,7 +209,6 @@ const PlaytestForm = () => {
     setSubmissionType('upload'); // Reset tab state
     // TODO: Add a way to reset the FileUpload component if it has internal state
     setIsSuccess(false);
-    setUploadProgress(0);
   };
 
   // Success screen rendering (remains the same)
@@ -382,36 +365,15 @@ const PlaytestForm = () => {
                   </FormItem>
                 )}
               />
-
-
-             {/* Progress Bar - Show only for upload type */}
-             {isSubmitting && submissionType === 'upload' && uploadProgress > 0 && (
-               <div className="w-full pt-4">
-                 <div className="h-2 w-full bg-cyber-dark rounded-full overflow-hidden">
-                   <div
-                     className="h-full bg-cyber-neon-purple transition-all duration-300 ease-out"
-                     style={{ width: `${uploadProgress}%` }}
-                   />
-                 </div>
-                 <div className="flex justify-between items-center mt-1">
-                   <p className="text-xs text-muted-foreground">
-                     {uploadProgress < 100 ? 'Uploading...' : 'Processing...'}
-                   </p>
-                   <p className="text-xs font-medium">
-                     {uploadProgress < 100 ? `${Math.round(uploadProgress)}%` : 'Complete'}
-                   </p>
-                 </div>
-               </div>
-             )}
            </CardContent>
 
            <CardFooter>
              <Button
                type="submit"
                className="cyber-button w-full"
-               disabled={isSubmitting} // Disable button while submitting
+               disabled={isSubmitting}
              >
-               {isSubmitting ? "Submitting..." : "Submit Game Build"}
+               {isSubmitting ? "Submitting..." : "Submit for Playtest"}
              </Button>
            </CardFooter>
          </form>
