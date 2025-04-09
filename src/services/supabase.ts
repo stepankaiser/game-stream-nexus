@@ -139,7 +139,7 @@ export const uploadGameBuildToS3 = async (
 
       // Optional: Adjust queue size and part size for performance
       // queueSize: 4, // Number of concurrent parts uploads
-      // partSize: 1024 * 1024 * 5, // Part size in bytes (min 5MB for S3 multipart)
+      partSize: 10 * 1024 * 1024, // Explicitly set part size to 10MB
 
       // Enable progress reporting
       leavePartsOnError: false, // Clean up parts on error
