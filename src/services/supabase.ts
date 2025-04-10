@@ -250,12 +250,11 @@ export const sendConfirmationEmail = async (
     // Ensure required config and client are available
     if (!sesClient || !sesSenderEmail) {
         console.error("SES client or sender email not configured. Skipping email.");
-        // Decide if you want to throw an error or just log and continue
-        // throw new Error("SES client or sender email not configured due to missing environment variables.");
-        return; // Silently fail if not configured
+        return;
     }
 
     const subject = "Your Game Build Submission - Next Steps";
+    const adminSubject = "New Game Build Submission Received";
 
     // --- Updated Email Content ---
     let bodyText = `Hello,\n\nThank you for submitting your game build! We've received it successfully.\n\n`;
@@ -269,9 +268,19 @@ export const sendConfirmationEmail = async (
     bodyText += `1. 24-Hour Setup:\n   Our team will prepare the cloud streaming environment using Amazon GameLift Streams technology within 24 hours.\n\n`;
     bodyText += `2. Receive Link:\n   We'll send you a secure link to access your game in the cloud. No downloads or installations required.\n\n`;
     bodyText += `3. Play & Evaluate:\n   Experience your game through cloud streaming and evaluate if this technology fits your needs and use cases.\n\n`;
-    bodyText += `If you have any questions in the meantime, please don't hesitate to contact us at stepan@remangu.com.\n\n`; // Corrected email address
+    bodyText += `If you have any questions in the meantime, please don't hesitate to contact us at stepan@remangu.com.\n\n`;
     bodyText += `Best regards,\nThe Team`;
 
+    // Admin email content
+    let adminBodyText = `New Game Build Submission Received\n\n`;
+    adminBodyText += `Submission ID: ${submissionId}\n`;
+    adminBodyText += `User Email: ${recipientEmail}\n`;
+    if (submissionType === 'upload' && details.fileName) {
+        adminBodyText += `Uploaded File: ${details.fileName}\n`;
+    } else if (submissionType === 'url' && details.gameBuildUrl) {
+        adminBodyText += `Submitted URL: ${details.gameBuildUrl}\n`;
+    }
+    adminBodyText += `\nPlease process this submission within 24 hours.\n`;
 
     let bodyHtml = `<p>Hello,</p>`;
     bodyHtml += `<p>Thank you for submitting your game build! We've received it successfully.</p>`;
@@ -287,15 +296,25 @@ export const sendConfirmationEmail = async (
     bodyHtml += `<li style="margin-bottom: 10px;"><strong>Receive Link:</strong><br>We'll send you a secure link to access your game in the cloud. No downloads or installations required.</li>`;
     bodyHtml += `<li style="margin-bottom: 10px;"><strong>Play & Evaluate:</strong><br>Experience your game through cloud streaming and evaluate if this technology fits your needs and use cases.</li>`;
     bodyHtml += `</ol>`;
-    bodyHtml += `<p>If you have any questions in the meantime, please don't hesitate to contact us at <a href="mailto:stepan@remangu.com">stepan@remangu.com</a>.</p>`; // Corrected email address
-    bodyHtml += `<p>Best regards,<br>The Team</p>`;
-    // --- End of Updated Email Content ---
+    bodyHtml += `<p>If you have any questions in the meantime, please don't hesitate to contact us at <a href="mailto:stepan@remangu.com">stepan@remangu.com</a>.</p>`;
+    bodyHtml += `<p>Best regards,<br>The Remangu Team</p>`;
 
+    // Admin email HTML content
+    let adminBodyHtml = `<h2>New Game Build Submission Received</h2>`;
+    adminBodyHtml += `<p><strong>Submission ID:</strong> ${submissionId}</p>`;
+    adminBodyHtml += `<p><strong>User Email:</strong> ${recipientEmail}</p>`;
+    if (submissionType === 'upload' && details.fileName) {
+        adminBodyHtml += `<p><strong>Uploaded File:</strong> ${details.fileName}</p>`;
+    } else if (submissionType === 'url' && details.gameBuildUrl) {
+        adminBodyHtml += `<p><strong>Submitted URL:</strong> ${details.gameBuildUrl}</p>`;
+    }
+    adminBodyHtml += `<p>Please process this submission within 24 hours.</p>`;
 
-    const params = {
-        Source: sesSenderEmail, // The verified 'From' address
+    // Send email to user
+    const userParams = {
+        Source: sesSenderEmail,
         Destination: {
-            ToAddresses: [recipientEmail], // The user's email
+            ToAddresses: [recipientEmail],
         },
         Message: {
             Subject: {
@@ -313,19 +332,45 @@ export const sendConfirmationEmail = async (
                 },
             },
         },
-        // Optional: ConfigurationSetName for tracking, ReplyToAddresses, etc.
+    };
+
+    // Send email to admin
+    const adminParams = {
+        Source: sesSenderEmail,
+        Destination: {
+            ToAddresses: ['stepan@remangu.com'],
+        },
+        Message: {
+            Subject: {
+                Data: adminSubject,
+                Charset: 'UTF-8',
+            },
+            Body: {
+                Text: {
+                    Data: adminBodyText,
+                    Charset: 'UTF-8',
+                },
+                Html: {
+                    Data: adminBodyHtml,
+                    Charset: 'UTF-8',
+                },
+            },
+        },
     };
 
     try {
-        console.log("Attempting to send email with params:", JSON.stringify(params, null, 2)); // Log parameters
-        const command = new SendEmailCommand(params);
-        const response = await sesClient.send(command); // Capture response
-        console.log(`Confirmation email successfully sent to ${recipientEmail}. SES Response:`, JSON.stringify(response, null, 2)); // Log success response
+        // Send user email
+        const userCommand = new SendEmailCommand(userParams);
+        const userResponse = await sesClient.send(userCommand);
+        console.log(`Confirmation email successfully sent to ${recipientEmail}. SES Response:`, JSON.stringify(userResponse, null, 2));
+
+        // Send admin email
+        const adminCommand = new SendEmailCommand(adminParams);
+        const adminResponse = await sesClient.send(adminCommand);
+        console.log(`Admin notification email successfully sent to stepan@remangu.com. SES Response:`, JSON.stringify(adminResponse, null, 2));
     } catch (error: any) {
-        console.error(`Error sending confirmation email via SES to ${recipientEmail}. Params Sent:`, JSON.stringify(params, null, 2)); // Log params on error
-        console.error("Full SES Error:", error); // Log the full error object
-        // Decide how to handle email failure - log, maybe notify admin, but likely don't fail the whole submission
-        // throw new Error(`SES Email Send Failed: ${error.message || String(error)}`);
+        console.error(`Error sending emails via SES. Params Sent:`, JSON.stringify({ userParams, adminParams }, null, 2));
+        console.error("Full SES Error:", error);
     }
 };
 
