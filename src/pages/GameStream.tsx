@@ -212,6 +212,30 @@ const GameStream = () => {
           const sdkInstance = new window.gameliftstreams.GameLiftStreams({
               videoElement: videoRef.current,
               audioElement: audioRef.current,
+              inputConfiguration: {
+                  autoGamepad: true,
+                  autoKeyboard: true,
+                  autoMouse: true,
+                  autoPointerLock: true,
+                  setCursor: true,
+                  trackWindowFocus: true,
+                  resetOnDetach: true,
+                  keyboardConfiguration: {
+                      enabled: true,
+                      autoCapture: true,
+                      preventDefaults: true
+                  },
+                  mouseConfiguration: {
+                      enabled: true,
+                      autoCapture: true,
+                      preventDefaults: true,
+                      pointerLockConfig: {
+                          enabled: true,
+                          autoRequest: true,
+                          autoRelease: true
+                      }
+                  }
+              },
               clientConnection: {
                   connectionState: handleConnectionStateChange,
                   serverDisconnect: (reasoncode: string) => {
@@ -225,29 +249,8 @@ const GameStream = () => {
                       setError("Stream encountered a data channel error.");
                       setStatusMessage("Stream encountered a data channel error.");
                       setConnectionStatus('Error');
-                  },
-                  onTrack: (event: RTCTrackEvent) => {
-                    console.log("[SDK Callback] onTrack - Received track:", {
-                      kind: event.track.kind,
-                      id: event.track.id,
-                      label: event.track.label,
-                      streamCount: event.streams?.length
-                    });
-                    if (videoRef.current && event.streams && event.streams[0]) {
-                      console.log("[SDK Callback] onTrack - Setting srcObject and attempting play");
-                      videoRef.current.srcObject = event.streams[0];
-                      videoRef.current.play()
-                        .then(() => console.log("[SDK Callback] onTrack - Video play() succeeded"))
-                        .catch(err => console.warn("[SDK Callback] onTrack - Video play() failed:", err));
-                    } else {
-                      console.warn("[SDK Callback] onTrack - Missing video ref or streams:", {
-                        hasVideoRef: !!videoRef.current,
-                        hasStreams: !!event.streams,
-                        streamCount: event.streams?.length
-                      });
-                    }
                   }
-              },
+              }
           });
           setGameliftSdkInstance(sdkInstance);
           console.log("[SDK Init Effect] SDK Instance CREATED.");
@@ -284,15 +287,14 @@ const GameStream = () => {
         setConnectionStatus('Connected');
         setStatusMessage('Stream connected successfully!');
         
-        // Get input channel after connection is established
+        // Attach input when connection is established
         if (gameliftSdkInstance) {
-            const channels = gameliftSdkInstance.getDataChannels();
-            const input = channels.find((channel: RTCDataChannel) => channel.label === 'inputChannel');
-            if (input) {
-                console.log("[Connection] Input channel found and ready");
-                setInputChannel(input);
-            } else {
-                console.warn("[Connection] Input channel not found in data channels");
+            try {
+                console.log("[Connection] Attaching input...");
+                gameliftSdkInstance.attachInput();
+                console.log("[Connection] Input attached successfully");
+            } catch (err) {
+                console.error("[Connection] Failed to attach input:", err);
             }
         }
     } else if (state === 'connecting') {
@@ -303,10 +305,45 @@ const GameStream = () => {
         if (connectionStatus !== 'Error') {
             setConnectionStatus('Disconnected');
             setStatusMessage('Stream disconnected.');
-            setInputChannel(null); // Clear input channel on disconnect
+            
+            // Detach input and clear media streams
+            if (gameliftSdkInstance) {
+                try {
+                    gameliftSdkInstance.detachInput();
+                } catch (err) {
+                    console.error("[Connection] Failed to detach input:", err);
+                }
+            }
+            
+            if (videoRef.current) {
+                videoRef.current.srcObject = null;
+            }
+            if (audioRef.current) {
+                audioRef.current.srcObject = null;
+            }
         }
     }
   };
+
+  // Add cleanup effect for media streams
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+        videoRef.current.srcObject = null;
+      }
+      if (audioRef.current) {
+        const stream = audioRef.current.srcObject as MediaStream;
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+        audioRef.current.srcObject = null;
+      }
+    };
+  }, []);
 
   // --- Effect: Initiate Session & Poll Status --- 
   useEffect(() => {
@@ -574,57 +611,98 @@ const GameStream = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // Add input handling effect
+  // Update the input handling effect
   useEffect(() => {
-    if (!videoRef.current || !inputChannel || connectionStatus !== 'Connected') return;
+    if (!videoRef.current || !gameliftSdkInstance || connectionStatus !== 'Connected') {
+        console.log("[Input] Skipping input setup - missing requirements:", {
+            hasVideo: !!videoRef.current,
+            hasSDK: !!gameliftSdkInstance,
+            status: connectionStatus
+        });
+        return;
+    }
 
+    console.log("[Input] Setting up input handlers");
     const video = videoRef.current;
-
-    const handleMouseEvent = (e: MouseEvent) => {
-      const rect = video.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width;
-      const y = (e.clientY - rect.top) / rect.height;
-      
-      inputChannel.send(JSON.stringify({
-        type: e.type,
-        x,
-        y,
-        button: e.button,
-        buttons: e.buttons
-      }));
-    };
-
-    const handleKeyEvent = (e: KeyboardEvent) => {
-      inputChannel.send(JSON.stringify({
-        type: e.type,
-        key: e.key,
-        code: e.code,
-        repeat: e.repeat,
-        ctrlKey: e.ctrlKey,
-        altKey: e.altKey,
-        shiftKey: e.shiftKey,
-        metaKey: e.metaKey
-      }));
-    };
-
-    // Add event listeners
-    video.addEventListener('mousedown', handleMouseEvent);
-    video.addEventListener('mouseup', handleMouseEvent);
-    video.addEventListener('mousemove', handleMouseEvent);
-    video.addEventListener('keydown', handleKeyEvent);
-    video.addEventListener('keyup', handleKeyEvent);
 
     // Make video focusable
     video.tabIndex = 0;
+    video.style.outline = 'none';
 
-    return () => {
-      video.removeEventListener('mousedown', handleMouseEvent);
-      video.removeEventListener('mouseup', handleMouseEvent);
-      video.removeEventListener('mousemove', handleMouseEvent);
-      video.removeEventListener('keydown', handleKeyEvent);
-      video.removeEventListener('keyup', handleKeyEvent);
+    // Focus video on mount and click
+    video.focus();
+    video.addEventListener('click', () => {
+        video.focus();
+        video.requestPointerLock();
+        console.log("[Input] Video focused and pointer lock requested");
+    });
+
+    // Handle fullscreen changes
+    const handleFullscreenChange = () => {
+        if (document.fullscreenElement === video) {
+            console.log("[Input] Video entered fullscreen");
+            video.focus();
+            video.requestPointerLock();
+        } else {
+            console.log("[Input] Video exited fullscreen");
+            if (document.pointerLockElement === video) {
+                document.exitPointerLock();
+            }
+        }
     };
-  }, [videoRef.current, inputChannel, connectionStatus]);
+
+    // Handle pointer lock changes
+    const handlePointerLockChange = () => {
+        if (document.pointerLockElement === video) {
+            console.log("[Input] Pointer lock acquired");
+            try {
+                gameliftSdkInstance.attachInput();
+                console.log("[Input] Input attached to SDK");
+            } catch (err) {
+                console.error("[Input] Failed to attach input:", err);
+            }
+        } else {
+            console.log("[Input] Pointer lock released");
+            try {
+                gameliftSdkInstance.detachInput();
+                console.log("[Input] Input detached from SDK");
+            } catch (err) {
+                console.error("[Input] Failed to detach input:", err);
+            }
+        }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('pointerlockchange', handlePointerLockChange);
+
+    // Initial input attachment
+    try {
+        gameliftSdkInstance.attachInput();
+        console.log("[Input] Initial input attachment successful");
+    } catch (err) {
+        console.error("[Input] Failed initial input attachment:", err);
+    }
+
+    // Cleanup
+    return () => {
+        console.log("[Input] Cleaning up input handlers");
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        document.removeEventListener('pointerlockchange', handlePointerLockChange);
+        
+        if (document.pointerLockElement === video) {
+            document.exitPointerLock();
+        }
+        
+        if (gameliftSdkInstance) {
+            try {
+                gameliftSdkInstance.detachInput();
+                console.log("[Input] Input detached");
+            } catch (err) {
+                console.error("[Input] Failed to detach input:", err);
+            }
+        }
+    };
+}, [videoRef.current, gameliftSdkInstance, connectionStatus]);
 
   // --- Render Logic ---
 
@@ -650,10 +728,15 @@ const GameStream = () => {
               ref={videoRef} 
               className="w-full h-full" 
               playsInline 
-              muted 
-              onClick={(e) => e.currentTarget.focus()} // Add click handler to focus
+              autoPlay
+              muted
+              tabIndex={0}
+              style={{ outline: 'none' }}
             />
-            <audio ref={audioRef} className="hidden" />
+            <audio 
+              ref={audioRef} 
+              autoPlay 
+            />
             
             {connectionStatus !== 'Connected' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-white">
