@@ -60,6 +60,7 @@ const GameStream = () => {
   const [streamSessionArn, setStreamSessionArn] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>('Checking submission...');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [inputChannel, setInputChannel] = useState<RTCDataChannel | null>(null);
   
   // Refs for intervals/timeouts
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -282,6 +283,18 @@ const GameStream = () => {
     if (state === 'connected') {
         setConnectionStatus('Connected');
         setStatusMessage('Stream connected successfully!');
+        
+        // Get input channel after connection is established
+        if (gameliftSdkInstance) {
+            const channels = gameliftSdkInstance.getDataChannels();
+            const input = channels.find((channel: RTCDataChannel) => channel.label === 'inputChannel');
+            if (input) {
+                console.log("[Connection] Input channel found and ready");
+                setInputChannel(input);
+            } else {
+                console.warn("[Connection] Input channel not found in data channels");
+            }
+        }
     } else if (state === 'connecting') {
         setConnectionStatus('StartingSession');
         setStatusMessage('Connection establishing...');
@@ -290,6 +303,7 @@ const GameStream = () => {
         if (connectionStatus !== 'Error') {
             setConnectionStatus('Disconnected');
             setStatusMessage('Stream disconnected.');
+            setInputChannel(null); // Clear input channel on disconnect
         }
     }
   };
@@ -560,6 +574,58 @@ const GameStream = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Add input handling effect
+  useEffect(() => {
+    if (!videoRef.current || !inputChannel || connectionStatus !== 'Connected') return;
+
+    const video = videoRef.current;
+
+    const handleMouseEvent = (e: MouseEvent) => {
+      const rect = video.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width;
+      const y = (e.clientY - rect.top) / rect.height;
+      
+      inputChannel.send(JSON.stringify({
+        type: e.type,
+        x,
+        y,
+        button: e.button,
+        buttons: e.buttons
+      }));
+    };
+
+    const handleKeyEvent = (e: KeyboardEvent) => {
+      inputChannel.send(JSON.stringify({
+        type: e.type,
+        key: e.key,
+        code: e.code,
+        repeat: e.repeat,
+        ctrlKey: e.ctrlKey,
+        altKey: e.altKey,
+        shiftKey: e.shiftKey,
+        metaKey: e.metaKey
+      }));
+    };
+
+    // Add event listeners
+    video.addEventListener('mousedown', handleMouseEvent);
+    video.addEventListener('mouseup', handleMouseEvent);
+    video.addEventListener('mousemove', handleMouseEvent);
+    video.addEventListener('keydown', handleKeyEvent);
+    video.addEventListener('keyup', handleKeyEvent);
+
+    // Make video focusable
+    video.tabIndex = 0;
+
+    return () => {
+      video.removeEventListener('mousedown', handleMouseEvent);
+      video.removeEventListener('mouseup', handleMouseEvent);
+      video.removeEventListener('mousemove', handleMouseEvent);
+      video.removeEventListener('keydown', handleKeyEvent);
+      video.removeEventListener('keyup', handleKeyEvent);
+    };
+  }, [videoRef.current, inputChannel, connectionStatus]);
+
   // --- Render Logic ---
 
   return (
@@ -580,7 +646,13 @@ const GameStream = () => {
         </CardHeader>
         <CardContent className="flex flex-col items-center">
           <div ref={videoContainerRef} className="relative w-full max-w-4xl aspect-video bg-black rounded overflow-hidden mb-4">
-            <video ref={videoRef} className="w-full h-full" playsInline muted />
+            <video 
+              ref={videoRef} 
+              className="w-full h-full" 
+              playsInline 
+              muted 
+              onClick={(e) => e.currentTarget.focus()} // Add click handler to focus
+            />
             <audio ref={audioRef} className="hidden" />
             
             {connectionStatus !== 'Connected' && (
