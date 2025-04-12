@@ -1,0 +1,1206 @@
+{
+ "Resources": {
+  "GameLiftLambdaRoleB85831D5": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameLiftLambdaRole/Resource"
+   }
+  },
+  "GameLiftLambdaRoleDefaultPolicy747AD5F7": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "gamelift:CreateBuild",
+        "gamelift:DescribeBuild",
+        "gameliftstreams:CreateApplication",
+        "gameliftstreams:TagResource",
+        "gameliftstreams:AssociateApplications"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": "dynamodb:UpdateItem",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:",
+          {
+           "Ref": "AWS::Partition"
+          },
+          ":dynamodb:",
+          {
+           "Ref": "AWS::Region"
+          },
+          ":",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":table/submissions"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": [
+        "s3:ListBucket",
+        "s3:GetObject"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        "arn:aws:s3:::game-builds-remangu",
+        "arn:aws:s3:::game-builds-remangu/test-submission-001/*"
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "GameLiftLambdaRoleDefaultPolicy747AD5F7",
+    "Roles": [
+     {
+      "Ref": "GameLiftLambdaRoleB85831D5"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameLiftLambdaRole/DefaultPolicy/Resource"
+   }
+  },
+  "CreateAppFunction1153C4CD": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "e9b9571349f89a33ac62cf3f4322f6876611d9b05e9716991bddfbbb9b90407a.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "DYNAMODB_TABLE_NAME": "submissions",
+      "STREAM_GROUP_ID": "sg-5ZVBpCfLM"
+     }
+    },
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "GameLiftLambdaRoleB85831D5",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs18.x",
+    "Timeout": 60
+   },
+   "DependsOn": [
+    "GameLiftLambdaRoleDefaultPolicy747AD5F7",
+    "GameLiftLambdaRoleB85831D5"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/CreateAppFunction/Resource",
+    "aws:asset:path": "asset.e9b9571349f89a33ac62cf3f4322f6876611d9b05e9716991bddfbbb9b90407a",
+    "aws:asset:is-bundled": true,
+    "aws:asset:property": "Code"
+   }
+  },
+  "AssociateAppFunctionD8A3C60F": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "4cf96a49b24650fae5981271f08ac40f571103186ae73c330bf9e3183a018786.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "DYNAMODB_TABLE_NAME": "submissions",
+      "STREAM_GROUP_ID": "sg-5ZVBpCfLM"
+     }
+    },
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "GameLiftLambdaRoleB85831D5",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs18.x",
+    "Timeout": 60
+   },
+   "DependsOn": [
+    "GameLiftLambdaRoleDefaultPolicy747AD5F7",
+    "GameLiftLambdaRoleB85831D5"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/AssociateAppFunction/Resource",
+    "aws:asset:path": "asset.4cf96a49b24650fae5981271f08ac40f571103186ae73c330bf9e3183a018786",
+    "aws:asset:is-bundled": true,
+    "aws:asset:property": "Code"
+   }
+  },
+  "UpdateDbFunction67988D94": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "4f4de4883f70e34ae42bb03dd512479f97dd4891ad9df0500b88d9524e619b2a.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "DYNAMODB_TABLE_NAME": "submissions",
+      "STREAM_GROUP_ID": "sg-5ZVBpCfLM"
+     }
+    },
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "GameLiftLambdaRoleB85831D5",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs18.x",
+    "Timeout": 60
+   },
+   "DependsOn": [
+    "GameLiftLambdaRoleDefaultPolicy747AD5F7",
+    "GameLiftLambdaRoleB85831D5"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/UpdateDbFunction/Resource",
+    "aws:asset:path": "asset.4f4de4883f70e34ae42bb03dd512479f97dd4891ad9df0500b88d9524e619b2a",
+    "aws:asset:is-bundled": true,
+    "aws:asset:property": "Code"
+   }
+  },
+  "StartSfnLambdaRole738ED1D0": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "lambda.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+       ]
+      ]
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/StartSfnLambdaRole/Resource"
+   }
+  },
+  "StartSfnLambdaRoleDefaultPolicy7FE262F5": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "dynamodb:GetItem",
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:",
+          {
+           "Ref": "AWS::Partition"
+          },
+          ":dynamodb:",
+          {
+           "Ref": "AWS::Region"
+          },
+          ":",
+          {
+           "Ref": "AWS::AccountId"
+          },
+          ":table/submissions"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": "states:StartExecution",
+       "Effect": "Allow",
+       "Resource": {
+        "Ref": "GameStreamProvisioningMachine6F507EBE"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "StartSfnLambdaRoleDefaultPolicy7FE262F5",
+    "Roles": [
+     {
+      "Ref": "StartSfnLambdaRole738ED1D0"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/StartSfnLambdaRole/DefaultPolicy/Resource"
+   }
+  },
+  "GameStreamProvisioningMachineRole097929F4": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "states.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningMachine/Role/Resource"
+   }
+  },
+  "GameStreamProvisioningMachineRoleDefaultPolicy401D9105": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "CreateAppFunction1153C4CD",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "CreateAppFunction1153C4CD",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "AssociateAppFunctionD8A3C60F",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "AssociateAppFunctionD8A3C60F",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        }
+       ]
+      },
+      {
+       "Action": "lambda:InvokeFunction",
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::GetAtt": [
+          "UpdateDbFunction67988D94",
+          "Arn"
+         ]
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::GetAtt": [
+             "UpdateDbFunction67988D94",
+             "Arn"
+            ]
+           },
+           ":*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "GameStreamProvisioningMachineRoleDefaultPolicy401D9105",
+    "Roles": [
+     {
+      "Ref": "GameStreamProvisioningMachineRole097929F4"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningMachine/Role/DefaultPolicy/Resource"
+   }
+  },
+  "GameStreamProvisioningMachine6F507EBE": {
+   "Type": "AWS::StepFunctions::StateMachine",
+   "Properties": {
+    "DefinitionString": {
+     "Fn::Join": [
+      "",
+      [
+       "{\"StartAt\":\"CreateAppTask\",\"States\":{\"CreateAppTask\":{\"Next\":\"AssociateAppTask\",\"Retry\":[{\"ErrorEquals\":[\"Lambda.ClientExecutionTimeoutException\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\"],\"IntervalSeconds\":2,\"MaxAttempts\":6,\"BackoffRate\":2}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"Next\":\"ProvisioningFailed\"}],\"Type\":\"Task\",\"Comment\":\"Create GameLift Streams Application from S3 source\",\"InputPath\":\"$\",\"ResultPath\":\"$.AppDetails\",\"Resource\":\"",
+       {
+        "Fn::GetAtt": [
+         "CreateAppFunction1153C4CD",
+         "Arn"
+        ]
+       },
+       "\"},\"AssociateAppTask\":{\"Next\":\"UpdateDbStatusTask\",\"Retry\":[{\"ErrorEquals\":[\"Lambda.ClientExecutionTimeoutException\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\"],\"IntervalSeconds\":2,\"MaxAttempts\":6,\"BackoffRate\":2}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"Next\":\"ProvisioningFailed\"}],\"Type\":\"Task\",\"Comment\":\"Associate Application with Stream Group\",\"ResultPath\":\"$.AssociationDetails\",\"Resource\":\"",
+       {
+        "Fn::GetAtt": [
+         "AssociateAppFunctionD8A3C60F",
+         "Arn"
+        ]
+       },
+       "\",\"Parameters\":{\"ApplicationArn.$\":\"$.AppDetails.ApplicationArn\",\"submissionId.$\":\"$.submissionId\"}},\"UpdateDbStatusTask\":{\"Next\":\"ProvisioningSucceeded\",\"Retry\":[{\"ErrorEquals\":[\"Lambda.ClientExecutionTimeoutException\",\"Lambda.ServiceException\",\"Lambda.AWSLambdaException\",\"Lambda.SdkClientException\"],\"IntervalSeconds\":2,\"MaxAttempts\":6,\"BackoffRate\":2}],\"Catch\":[{\"ErrorEquals\":[\"States.ALL\"],\"Next\":\"ProvisioningFailed\"}],\"Type\":\"Task\",\"Comment\":\"Update DynamoDB submission status to READY\",\"ResultPath\":null,\"Resource\":\"",
+       {
+        "Fn::GetAtt": [
+         "UpdateDbFunction67988D94",
+         "Arn"
+        ]
+       },
+       "\",\"Parameters\":{\"submissionId.$\":\"$.submissionId\",\"applicationArn.$\":\"$.AppDetails.ApplicationArn\",\"streamGroupId.$\":\"$.AssociationDetails.StreamGroupId\",\"status\":\"READY\"}},\"ProvisioningSucceeded\":{\"Type\":\"Succeed\",\"Comment\":\"GameLift provisioning completed successfully\"},\"ProvisioningFailed\":{\"Type\":\"Fail\",\"Comment\":\"GameLift provisioning failed\"}},\"TimeoutSeconds\":3600,\"Comment\":\"State machine to provision GameLift Streams application\"}"
+      ]
+     ]
+    },
+    "RoleArn": {
+     "Fn::GetAtt": [
+      "GameStreamProvisioningMachineRole097929F4",
+      "Arn"
+     ]
+    }
+   },
+   "DependsOn": [
+    "GameStreamProvisioningMachineRoleDefaultPolicy401D9105",
+    "GameStreamProvisioningMachineRole097929F4"
+   ],
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningMachine/Resource"
+   }
+  },
+  "StartStepFunctionLambda38D7D55E": {
+   "Type": "AWS::Lambda::Function",
+   "Properties": {
+    "Code": {
+     "S3Bucket": {
+      "Fn::Sub": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}"
+     },
+     "S3Key": "45f82c4b1b40cf7db5d8466db10708bef19e15ef75e0fe83ec961ada1ea6815c.zip"
+    },
+    "Environment": {
+     "Variables": {
+      "DYNAMODB_TABLE_NAME": "submissions",
+      "STREAM_GROUP_ID": "sg-5ZVBpCfLM",
+      "STATE_MACHINE_ARN": {
+       "Ref": "GameStreamProvisioningMachine6F507EBE"
+      }
+     }
+    },
+    "Handler": "index.handler",
+    "Role": {
+     "Fn::GetAtt": [
+      "StartSfnLambdaRole738ED1D0",
+      "Arn"
+     ]
+    },
+    "Runtime": "nodejs18.x",
+    "Timeout": 60
+   },
+   "DependsOn": [
+    "StartSfnLambdaRoleDefaultPolicy7FE262F5",
+    "StartSfnLambdaRole738ED1D0"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/StartStepFunctionLambda/Resource",
+    "aws:asset:path": "asset.45f82c4b1b40cf7db5d8466db10708bef19e15ef75e0fe83ec961ada1ea6815c",
+    "aws:asset:is-bundled": true,
+    "aws:asset:property": "Code"
+   }
+  },
+  "GameStreamProvisioningApiAC4F149E": {
+   "Type": "AWS::ApiGateway::RestApi",
+   "Properties": {
+    "Description": "API to trigger GameLift provisioning.",
+    "Name": "GameStream Provisioning Service"
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningApi/Resource"
+   }
+  },
+  "GameStreamProvisioningApiCloudWatchRole6AD51587": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "apigateway.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "ManagedPolicyArns": [
+     {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+       ]
+      ]
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningApi/CloudWatchRole/Resource"
+   }
+  },
+  "GameStreamProvisioningApiAccount27C544D5": {
+   "Type": "AWS::ApiGateway::Account",
+   "Properties": {
+    "CloudWatchRoleArn": {
+     "Fn::GetAtt": [
+      "GameStreamProvisioningApiCloudWatchRole6AD51587",
+      "Arn"
+     ]
+    }
+   },
+   "DependsOn": [
+    "GameStreamProvisioningApiAC4F149E"
+   ],
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningApi/Account"
+   }
+  },
+  "GameStreamProvisioningApiDeployment752648F318d4742abd94a4c6b07e935d6e306c40": {
+   "Type": "AWS::ApiGateway::Deployment",
+   "Properties": {
+    "Description": "API to trigger GameLift provisioning.",
+    "RestApiId": {
+     "Ref": "GameStreamProvisioningApiAC4F149E"
+    }
+   },
+   "DependsOn": [
+    "GameStreamProvisioningApiOPTIONS2C15B8A1",
+    "GameStreamProvisioningApiprovisionOPTIONSE0D2CFB3",
+    "GameStreamProvisioningApiprovisionPOSTE9B08438",
+    "GameStreamProvisioningApiprovision269669B6"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningApi/Deployment/Resource"
+   }
+  },
+  "GameStreamProvisioningApiDeploymentStageprodF27CB675": {
+   "Type": "AWS::ApiGateway::Stage",
+   "Properties": {
+    "DeploymentId": {
+     "Ref": "GameStreamProvisioningApiDeployment752648F318d4742abd94a4c6b07e935d6e306c40"
+    },
+    "RestApiId": {
+     "Ref": "GameStreamProvisioningApiAC4F149E"
+    },
+    "StageName": "prod"
+   },
+   "DependsOn": [
+    "GameStreamProvisioningApiAccount27C544D5"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningApi/DeploymentStage.prod/Resource"
+   }
+  },
+  "GameStreamProvisioningApiOPTIONS2C15B8A1": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'POST,OPTIONS'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Fn::GetAtt": [
+      "GameStreamProvisioningApiAC4F149E",
+      "RootResourceId"
+     ]
+    },
+    "RestApiId": {
+     "Ref": "GameStreamProvisioningApiAC4F149E"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningApi/Default/OPTIONS/Resource"
+   }
+  },
+  "GameStreamProvisioningApiprovision269669B6": {
+   "Type": "AWS::ApiGateway::Resource",
+   "Properties": {
+    "ParentId": {
+     "Fn::GetAtt": [
+      "GameStreamProvisioningApiAC4F149E",
+      "RootResourceId"
+     ]
+    },
+    "PathPart": "provision",
+    "RestApiId": {
+     "Ref": "GameStreamProvisioningApiAC4F149E"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningApi/Default/provision/Resource"
+   }
+  },
+  "GameStreamProvisioningApiprovisionOPTIONSE0D2CFB3": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "ApiKeyRequired": false,
+    "AuthorizationType": "NONE",
+    "HttpMethod": "OPTIONS",
+    "Integration": {
+     "IntegrationResponses": [
+      {
+       "ResponseParameters": {
+        "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
+        "method.response.header.Access-Control-Allow-Origin": "'*'",
+        "method.response.header.Access-Control-Allow-Methods": "'POST,OPTIONS'"
+       },
+       "StatusCode": "204"
+      }
+     ],
+     "RequestTemplates": {
+      "application/json": "{ statusCode: 200 }"
+     },
+     "Type": "MOCK"
+    },
+    "MethodResponses": [
+     {
+      "ResponseParameters": {
+       "method.response.header.Access-Control-Allow-Headers": true,
+       "method.response.header.Access-Control-Allow-Origin": true,
+       "method.response.header.Access-Control-Allow-Methods": true
+      },
+      "StatusCode": "204"
+     }
+    ],
+    "ResourceId": {
+     "Ref": "GameStreamProvisioningApiprovision269669B6"
+    },
+    "RestApiId": {
+     "Ref": "GameStreamProvisioningApiAC4F149E"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningApi/Default/provision/OPTIONS/Resource"
+   }
+  },
+  "GameStreamProvisioningApiprovisionPOSTApiPermissionGameStreamProvisioningStackGameStreamProvisioningApi43ECF7F1POSTprovisionF983629D": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "StartStepFunctionLambda38D7D55E",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "GameStreamProvisioningApiAC4F149E"
+       },
+       "/",
+       {
+        "Ref": "GameStreamProvisioningApiDeploymentStageprodF27CB675"
+       },
+       "/POST/provision"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningApi/Default/provision/POST/ApiPermission.GameStreamProvisioningStackGameStreamProvisioningApi43ECF7F1.POST..provision"
+   }
+  },
+  "GameStreamProvisioningApiprovisionPOSTApiPermissionTestGameStreamProvisioningStackGameStreamProvisioningApi43ECF7F1POSTprovision890F2EF8": {
+   "Type": "AWS::Lambda::Permission",
+   "Properties": {
+    "Action": "lambda:InvokeFunction",
+    "FunctionName": {
+     "Fn::GetAtt": [
+      "StartStepFunctionLambda38D7D55E",
+      "Arn"
+     ]
+    },
+    "Principal": "apigateway.amazonaws.com",
+    "SourceArn": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":execute-api:",
+       {
+        "Ref": "AWS::Region"
+       },
+       ":",
+       {
+        "Ref": "AWS::AccountId"
+       },
+       ":",
+       {
+        "Ref": "GameStreamProvisioningApiAC4F149E"
+       },
+       "/test-invoke-stage/POST/provision"
+      ]
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningApi/Default/provision/POST/ApiPermission.Test.GameStreamProvisioningStackGameStreamProvisioningApi43ECF7F1.POST..provision"
+   }
+  },
+  "GameStreamProvisioningApiprovisionPOSTE9B08438": {
+   "Type": "AWS::ApiGateway::Method",
+   "Properties": {
+    "AuthorizationType": "NONE",
+    "HttpMethod": "POST",
+    "Integration": {
+     "IntegrationHttpMethod": "POST",
+     "Type": "AWS_PROXY",
+     "Uri": {
+      "Fn::Join": [
+       "",
+       [
+        "arn:",
+        {
+         "Ref": "AWS::Partition"
+        },
+        ":apigateway:",
+        {
+         "Ref": "AWS::Region"
+        },
+        ":lambda:path/2015-03-31/functions/",
+        {
+         "Fn::GetAtt": [
+          "StartStepFunctionLambda38D7D55E",
+          "Arn"
+         ]
+        },
+        "/invocations"
+       ]
+      ]
+     }
+    },
+    "ResourceId": {
+     "Ref": "GameStreamProvisioningApiprovision269669B6"
+    },
+    "RestApiId": {
+     "Ref": "GameStreamProvisioningApiAC4F149E"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/GameStreamProvisioningApi/Default/provision/POST/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/1VQy27CMBD8Fu5my+NCj0CFVKm0VdJ7tLE3wSSxI3YNiqL8e+UAhZ5mZmcf2lnAfPUKswleeKpNNa1tDn0qqCuFF856iw30ia9JbQs34revre6ivLJBmc5h400OP5jXtEEmVWOTG8ycN3Rk+BxhF5wW653iZYbMJAzrCIqXsAm6InkahX5buL+JeIxOjWW23g2Khdri5nEmyBXDxzj27s6+ov8N0O/Q1ioNWhMZlQoK7VEfrBufetaDwtaWKHTBDvqEWNatHT9/0LXWPjhRb9TWvmvISaw+qVSwvG8uSSXEPpz0NZc9ycGbaN7Y3b0dGfkwPMpjQnGRdWXs+QrSBhlUTBaO/HKer2Axg9XkyNZOT8GJbQiSK/4C865PGt0BAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "GameStreamProvisioningStack/CDKMetadata/Default"
+   },
+   "Condition": "CDKMetadataAvailable"
+  }
+ },
+ "Outputs": {
+  "GameStreamProvisioningApiEndpointFDE1B6DA": {
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "GameStreamProvisioningApiAC4F149E"
+      },
+      ".execute-api.",
+      {
+       "Ref": "AWS::Region"
+      },
+      ".",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "GameStreamProvisioningApiDeploymentStageprodF27CB675"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "ProvisioningApiEndpoint": {
+   "Description": "API endpoint for triggering GameLift provisioning",
+   "Value": {
+    "Fn::Join": [
+     "",
+     [
+      "https://",
+      {
+       "Ref": "GameStreamProvisioningApiAC4F149E"
+      },
+      ".execute-api.",
+      {
+       "Ref": "AWS::Region"
+      },
+      ".",
+      {
+       "Ref": "AWS::URLSuffix"
+      },
+      "/",
+      {
+       "Ref": "GameStreamProvisioningApiDeploymentStageprodF27CB675"
+      },
+      "/"
+     ]
+    ]
+   }
+  },
+  "StateMachineArnOutput": {
+   "Description": "ARN of the GameLift provisioning state machine",
+   "Value": {
+    "Ref": "GameStreamProvisioningMachine6F507EBE"
+   }
+  }
+ },
+ "Conditions": {
+  "CDKMetadataAvailable": {
+   "Fn::Or": [
+    {
+     "Fn::Or": [
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "af-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-east-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-northeast-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-northeast-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-northeast-3"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-south-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-3"
+       ]
+      }
+     ]
+    },
+    {
+     "Fn::Or": [
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ap-southeast-4"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ca-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "ca-west-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "cn-north-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "cn-northwest-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-central-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-north-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-south-2"
+       ]
+      }
+     ]
+    },
+    {
+     "Fn::Or": [
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-west-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-west-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "eu-west-3"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "il-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "me-central-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "me-south-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "sa-east-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "us-east-1"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "us-east-2"
+       ]
+      },
+      {
+       "Fn::Equals": [
+        {
+         "Ref": "AWS::Region"
+        },
+        "us-west-1"
+       ]
+      }
+     ]
+    },
+    {
+     "Fn::Equals": [
+      {
+       "Ref": "AWS::Region"
+      },
+      "us-west-2"
+     ]
+    }
+   ]
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

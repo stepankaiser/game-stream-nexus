@@ -1,0 +1,222 @@
+{
+  "version": "41.0.0",
+  "artifacts": {
+    "GameStreamProvisioningStack.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "GameStreamProvisioningStack.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "GameStreamProvisioningStack": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://unknown-account/unknown-region",
+      "properties": {
+        "templateFile": "GameStreamProvisioningStack.template.json",
+        "terminationProtection": false,
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-${AWS::Region}",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/38dc2cee9060bb4a93b25c416ac54fe996baf2ee36129a0355237e373ffbd800.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "GameStreamProvisioningStack.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-lookup-role-${AWS::AccountId}-${AWS::Region}",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "GameStreamProvisioningStack.assets"
+      ],
+      "metadata": {
+        "/GameStreamProvisioningStack/GameLiftLambdaRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameLiftLambdaRoleB85831D5"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameLiftLambdaRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameLiftLambdaRoleDefaultPolicy747AD5F7"
+          }
+        ],
+        "/GameStreamProvisioningStack/CreateAppFunction/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CreateAppFunction1153C4CD"
+          }
+        ],
+        "/GameStreamProvisioningStack/AssociateAppFunction/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "AssociateAppFunctionD8A3C60F"
+          }
+        ],
+        "/GameStreamProvisioningStack/UpdateDbFunction/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "UpdateDbFunction67988D94"
+          }
+        ],
+        "/GameStreamProvisioningStack/StartSfnLambdaRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "StartSfnLambdaRole738ED1D0"
+          }
+        ],
+        "/GameStreamProvisioningStack/StartSfnLambdaRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "StartSfnLambdaRoleDefaultPolicy7FE262F5"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningMachine/Role/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningMachineRole097929F4"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningMachine/Role/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningMachineRoleDefaultPolicy401D9105"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningMachine/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningMachine6F507EBE"
+          }
+        ],
+        "/GameStreamProvisioningStack/StartStepFunctionLambda/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "StartStepFunctionLambda38D7D55E"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiAC4F149E"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/CloudWatchRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiCloudWatchRole6AD51587"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/Account": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiAccount27C544D5"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/Deployment/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiDeployment752648F318d4742abd94a4c6b07e935d6e306c40"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/DeploymentStage.prod/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiDeploymentStageprodF27CB675"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/Endpoint": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiEndpointFDE1B6DA"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/Default/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiOPTIONS2C15B8A1"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/Default/provision/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiprovision269669B6"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/Default/provision/OPTIONS/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiprovisionOPTIONSE0D2CFB3"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/Default/provision/POST/ApiPermission.GameStreamProvisioningStackGameStreamProvisioningApi43ECF7F1.POST..provision": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiprovisionPOSTApiPermissionGameStreamProvisioningStackGameStreamProvisioningApi43ECF7F1POSTprovisionF983629D"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/Default/provision/POST/ApiPermission.Test.GameStreamProvisioningStackGameStreamProvisioningApi43ECF7F1.POST..provision": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiprovisionPOSTApiPermissionTestGameStreamProvisioningStackGameStreamProvisioningApi43ECF7F1POSTprovision890F2EF8"
+          }
+        ],
+        "/GameStreamProvisioningStack/GameStreamProvisioningApi/Default/provision/POST/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "GameStreamProvisioningApiprovisionPOSTE9B08438"
+          }
+        ],
+        "/GameStreamProvisioningStack/ProvisioningApiEndpoint": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ProvisioningApiEndpoint"
+          }
+        ],
+        "/GameStreamProvisioningStack/StateMachineArnOutput": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "StateMachineArnOutput"
+          }
+        ],
+        "/GameStreamProvisioningStack/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/GameStreamProvisioningStack/CDKMetadata/Condition": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadataAvailable"
+          }
+        ],
+        "/GameStreamProvisioningStack/BootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BootstrapVersion"
+          }
+        ],
+        "/GameStreamProvisioningStack/CheckBootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CheckBootstrapVersion"
+          }
+        ]
+      },
+      "displayName": "GameStreamProvisioningStack"
+    },
+    "Tree": {
+      "type": "cdk:tree",
+      "properties": {
+        "file": "tree.json"
+      }
+    }
+  },
+  "minimumCliVersion": "2.1005.0"
+}

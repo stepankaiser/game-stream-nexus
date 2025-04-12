@@ -13,7 +13,8 @@ import FileUpload from '@/components/FileUpload';
 import { countries } from '@/lib/countries';
 import { 
     saveSubmissionToDynamoDB,
-    createGameLiftApplication, 
+    createGameLiftApplication,
+    sendConfirmationEmail 
 } from '@/services/supabase';
 import { Progress } from '@/components/ui/progress';
 import { Loader2 } from 'lucide-react';
@@ -28,11 +29,11 @@ const baseSchema = z.object({
 
 const uploadSchema = baseSchema.extend({
   submissionType: z.literal('upload'),
-  // Use simplified refine check for gameFile within this specific schema part
   gameFile: z.any().refine(files => !!files, { 
     message: "A game build folder is required for upload submissions",
   }),
-  gameUrl: z.string().optional(), // Keep optional here, won't be validated
+  executableName: z.string().min(1, { message: "Executable name is required" }).default("MyProject.exe"),
+  gameUrl: z.string().optional(),
 });
 
 const urlSchema = baseSchema.extend({
@@ -72,7 +73,14 @@ const playtestSchema = z.object({
   });
 */
 
-type PlaytestFormData = z.infer<typeof playtestSchema>;
+type PlaytestFormData = {
+  email: string;
+  country: string;
+  submissionType: 'upload' | 'url';
+  gameFile: FileList | null;
+  gameUrl?: string;
+  executableName?: string;
+};
 
 // --- Get API Gateway URLs from environment ---
 const presignedUrlApiEndpoint = import.meta.env.VITE_PRESIGNED_URL_API;
@@ -103,6 +111,7 @@ const PlaytestForm: React.FC = () => {
       submissionType: 'upload',
       gameFile: null,
       gameUrl: '',
+      executableName: 'MyProject.exe',
     },
   });
 
@@ -237,7 +246,7 @@ const PlaytestForm: React.FC = () => {
         const rootFolderName = firstFilePath.split('/')[0] || `game-build-${submissionId}`;
         originalFileName = rootFolderName;
         gameBuildS3UriPrefix = `s3://${import.meta.env.VITE_S3_BUCKET_NAME}/game-builds/${submissionId}/`;
-        executablePath = `${rootFolderName}/MyProject.exe`;
+        executablePath = `${rootFolderName}/${data.executableName}`;
 
         console.log(`Processing ${files.length} files from folder: ${rootFolderName}`);
         setStatusMessage(`Preparing to upload ${files.length} files...`);
@@ -350,6 +359,23 @@ const PlaytestForm: React.FC = () => {
            console.warn("Provisioning endpoint not configured. Skipping trigger.");
       }
 
+      // After successful DynamoDB save, send confirmation email
+      try {
+        await sendConfirmationEmail(
+          data.email,
+          submissionId,
+          data.submissionType,
+          {
+            fileName: data.submissionType === 'upload' ? originalFileName : undefined,
+            gameBuildUrl: data.submissionType === 'url' ? data.gameUrl : undefined
+          }
+        );
+        console.log('Confirmation email sent successfully');
+      } catch (emailError) {
+        console.error('Failed to send confirmation email:', emailError);
+        // Don't fail the submission if email fails
+      }
+
       // --- Navigate directly to Stream page --- 
       setStatusMessage('Submission successful! Redirecting to stream page...');
       console.log(`onSubmit completed successfully. Navigating to /stream/${submissionId}`);
@@ -425,29 +451,44 @@ const PlaytestForm: React.FC = () => {
       </div>
 
       {submissionType === 'upload' && (
-        <div>
-          <Label htmlFor="gameFile" className="text-cyber-light">Game Build Folder</Label>
-          <Controller
-            name="gameFile"
-            control={control}
-            render={({ field: { onChange, value } }) => {
-              const handleChange = (files: FileList | null) => {
-                console.log('Controller onChange called with:', files);
-                onChange(files);
-              };
-              return (
-                <FileUpload 
-                  onChange={handleChange}
-                  value={value}
-                  className="mt-1" 
-                />
-              );
-            }}
-          />
-          {errors.gameFile && (
-            <p className="text-red-500 text-sm mt-1">{typeof errors.gameFile.message === 'string' ? errors.gameFile.message : 'Invalid input'}</p>
-          )}
-        </div>
+        <>
+          <div>
+            <Label htmlFor="gameFile" className="text-cyber-light">Game Build Folder</Label>
+            <Controller
+              name="gameFile"
+              control={control}
+              render={({ field: { onChange, value } }) => {
+                const handleChange = (files: FileList | null) => {
+                  console.log('Controller onChange called with:', files);
+                  onChange(files);
+                };
+                return (
+                  <FileUpload 
+                    onChange={handleChange}
+                    value={value}
+                    className="mt-1" 
+                  />
+                );
+              }}
+            />
+            {errors.gameFile && (
+              <p className="text-red-500 text-sm mt-1">{typeof errors.gameFile.message === 'string' ? errors.gameFile.message : 'Invalid input'}</p>
+            )}
+          </div>
+          <div>
+            <Label htmlFor="executableName" className="text-cyber-light">Executable Name</Label>
+            <Input 
+              id="executableName" 
+              {...register('executableName')} 
+              placeholder="MyProject.exe"
+              className="mt-1 bg-input border-cyber-purple/50 focus:border-cyber-neon-blue" 
+            />
+            {errors.executableName && (
+              <p className="text-red-500 text-sm mt-1">{errors.executableName.message}</p>
+            )}
+            <p className="text-sm text-muted-foreground mt-1">The name of your game's executable file (e.g., MyProject.exe)</p>
+          </div>
+        </>
       )}
 
       {submissionType === 'url' && (

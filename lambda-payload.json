@@ -1,0 +1,8 @@
+{
+  "requestContext": {
+    "http": {
+      "method": "POST"
+    }
+  },
+  "body": "{\"streamSessionArn\":\"arn:aws:gameliftstreams:eu-central-1:533267319964:streamsession/sg-5ZVBpCfLM/FakeSessionToTest\"}"
+} 

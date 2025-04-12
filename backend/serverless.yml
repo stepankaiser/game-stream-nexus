@@ -1,0 +1,71 @@
+# serverless.yml
+service: game-stream-nexus-backend
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x # Or nodejs20.x
+  region: eu-central-1 # Match your region
+  iam: # Permissions for the Lambda function
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            # Add s3:PutObjectAcl if you set ACL in PutObjectCommand
+          Resource: "arn:aws:s3:::game-builds-remangu/*" # Hardcoded bucket name
+  # Update CORS configuration to handle credentials
+  httpApi:
+    cors:
+      allowedOrigins:
+        - http://localhost:8081
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowedHeaders:
+        - Content-Type
+      allowCredentials: false
+      maxAge: 300 # Optional: cache preflight requests for 5 minutes
+  # Environment variables under provider
+  environment:
+    S3_BUCKET_NAME: game-builds-remangu # Hardcoded bucket name
+
+# Environment variables for Lambda functions
+package:
+  individually: true # Recommended for function-level settings
+  patterns:
+    - '!node_modules/**'
+    - '!.*'
+    - '!*.log'
+    # Include common files if needed by handlers
+    - 'env.js' 
+
+functions:
+  generatePresignedUrl:
+    handler: generatePresignedUrl.handler # Correct handler filename
+    package:
+      patterns: # Specific patterns for this function
+        - generatePresignedUrl.js # Include the correct compiled handler
+        - env.js # Include the helper file
+    events:
+      - httpApi:
+          path: /generate-presigned-url
+          method: post
+
+plugins:
+  - serverless-plugin-typescript
+  - serverless-offline # Optional: for local testing
+  # - serverless-dotenv-plugin # Removed
+
+# If using serverless-plugin-typescript, configure esbuild
+custom:
+  # dotenv: # Removed
+  #   path: ../.env # Ensure this path is correct relative to serverless.yml
+  #   include: # Explicitly list variables to load (optional but good practice)
+  #     - VITE_S3_BUCKET_NAME 
+  typescript:
+    lint: false # Optional: Disable linting during build if desired

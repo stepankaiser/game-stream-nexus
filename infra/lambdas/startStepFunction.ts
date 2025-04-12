@@ -58,19 +58,22 @@ export const handler = async (event: any) => {
       operatingSystem = 'WINDOWS_2022'
     } = submissionItem;
 
-    if (!s3Bucket || !s3Prefix || !executablePath) {
+    if (!s3Bucket || !s3Prefix) {
         throw new Error(`Missing required information for submission ${submissionId}`);
     }
 
     // Clean up s3Prefix by removing s3://bucket-name/ if present
     const cleanPrefix = s3Prefix.replace(new RegExp(`^s3://${s3Bucket}/`), '');
 
+    // Use the provided executablePath or fall back to environment variable
+    const finalExecutablePath = executablePath || process.env.GAMELIFT_EXECUTABLE_PATH || 'MyProject.exe';
+
     const stepFunctionInput = {
       submissionId,
       s3Bucket,
       s3Prefix: cleanPrefix,
       operatingSystem,
-      executablePath,
+      executablePath: finalExecutablePath,
     };
 
     const params: StartExecutionCommandInput = {
