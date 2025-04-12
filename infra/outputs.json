@@ -1,0 +1,7 @@
+{
+  "GameStreamProvisioningStack": {
+    "StateMachineArnOutput": "arn:aws:states:eu-central-1:533267319964:stateMachine:GameStreamProvisioningMachine6F507EBE-IC4mOuIrO9Or",
+    "ProvisioningApiEndpoint": "https://r9cgyzl3pc.execute-api.eu-central-1.amazonaws.com/prod/",
+    "GameStreamProvisioningApiEndpointFDE1B6DA": "https://r9cgyzl3pc.execute-api.eu-central-1.amazonaws.com/prod/"
+  }
+}

@@ -1,87 +1,76 @@
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Upload, Check, AlertCircle } from 'lucide-react';
+import { FolderUp, Check, AlertCircle } from 'lucide-react';
 
 interface FileUploadProps {
-  onFileSelect: (file: File) => void;
+  onChange: (files: FileList | null) => void;
+  value?: FileList | null;
   className?: string;
-  acceptedFileTypes?: string;
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
-  onFileSelect,
+  onChange,
+  value,
   className,
-  acceptedFileTypes = ".zip,.rar,.7z,.exe,.dmg"
 }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      validateAndSetFile(files[0]);
-    }
-  };
-
-  const validateAndSetFile = (file: File) => {
-    setError(null);
-
-    // Check file type if acceptedFileTypes is provided
-    if (acceptedFileTypes && acceptedFileTypes !== "*") {
-      const fileExtension = `.${file.name.split('.').pop()?.toLowerCase()}`;
-      const acceptedTypes = acceptedFileTypes.split(',');
-      
-      if (!acceptedTypes.some(type => type.trim() === fileExtension || type.trim() === file.type)) {
-        setError(`File type not accepted. Please upload: ${acceptedFileTypes}`);
-        return;
+  const selectedFiles = value;
+  const selectedFolderName = useMemo(() => {
+    if (selectedFiles && selectedFiles.length > 0) {
+      const firstFile = selectedFiles[0];
+      if (firstFile && typeof firstFile.webkitRelativePath === 'string') {
+          const pathParts = firstFile.webkitRelativePath.split('/');
+          return pathParts[0] || 'Selected Folder'; 
       }
+      return 'Selected Folder'; 
     }
+    return null;
+  }, [selectedFiles]);
+  const selectedFileCount = useMemo(() => selectedFiles?.length ?? 0, [selectedFiles]);
 
-    setSelectedFile(file);
-    onFileSelect(file);
-  };
+  const handleFilesSelected = useCallback((files: FileList | null) => {
+    setError(null);
+    onChange(files);
+  }, [onChange]);
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    handleFilesSelected(e.target.files);
+  }, [handleFilesSelected]);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
-  };
+  }, []);
 
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-  };
+  }, []);
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
-    
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      validateAndSetFile(files[0]);
-    }
-  };
+    setError("Folder drag-and-drop not supported. Please click to select.");
+  }, []);
 
-  const handleClick = () => {
+  const handleClick = useCallback(() => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
-  };
+  }, []);
 
-  const formatFileSize = (sizeInBytes: number): string => {
-    if (sizeInBytes < 1024) {
-      return `${sizeInBytes} B`;
-    } else if (sizeInBytes < 1024 * 1024) {
-      return `${(sizeInBytes / 1024).toFixed(2)} KB`;
-    } else if (sizeInBytes < 1024 * 1024 * 1024) {
-      return `${(sizeInBytes / (1024 * 1024)).toFixed(2)} MB`;
-    } else {
-      return `${(sizeInBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  const handleReset = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    setError(null);
+    onChange(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
-  };
+  }, [onChange]);
 
   return (
     <div className={cn("w-full", className)}>
@@ -89,9 +78,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept={acceptedFileTypes}
         className="hidden"
-        aria-label="Upload file"
+        aria-label="Select game build folder"
+        webkitdirectory=""
       />
       
       <div
@@ -104,8 +93,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
           "hover:border-cyber-neon-blue hover:bg-cyber-dark/40",
           {
             "border-cyber-neon-purple bg-cyber-dark/20": isDragging,
-            "border-cyber-purple/50 bg-transparent": !isDragging && !selectedFile,
-            "border-green-500/50 bg-green-500/10": !isDragging && selectedFile && !error,
+            "border-cyber-purple/50 bg-transparent": !isDragging && !selectedFolderName,
+            "border-green-500/50 bg-green-500/10": !isDragging && selectedFolderName && !error,
             "border-destructive/50 bg-destructive/10": error
           }
         )}
@@ -115,43 +104,36 @@ const FileUpload: React.FC<FileUploadProps> = ({
             <AlertCircle className="mx-auto h-12 w-12 text-destructive mb-2" />
             <p className="text-destructive font-medium">{error}</p>
             <Button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                setError(null); 
-                setSelectedFile(null);
-              }}
+              onClick={handleReset}
               variant="outline"
               className="mt-4 border-destructive/30 text-destructive hover:bg-destructive/10"
             >
               Try Again
             </Button>
           </div>
-        ) : selectedFile ? (
+        ) : selectedFolderName ? (
           <div className="py-4">
             <Check className="mx-auto h-12 w-12 text-green-500 mb-2" />
-            <p className="text-green-400 font-medium">{selectedFile.name}</p>
+            <p className="text-green-400 font-medium">Folder Selected: {selectedFolderName}</p>
             <p className="text-muted-foreground text-sm mt-1">
-              {formatFileSize(selectedFile.size)}
+              ({selectedFileCount} files detected)
             </p>
             <Button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                setSelectedFile(null);
-              }}
+              onClick={handleReset}
               variant="outline"
               className="mt-4 text-muted-foreground hover:text-white"
             >
-              Change File
+              Change Folder
             </Button>
           </div>
         ) : (
           <div className="py-4">
-            <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
+            <FolderUp className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
             <p className="text-white font-medium">
-              Drag and drop your game build here or click to browse
+              Click to select your game build folder
             </p>
             <p className="text-muted-foreground text-sm mt-1">
-              Accepted formats: .zip, .rar, .7z, .exe, .dmg
+              (Drag & drop not supported for folders)
             </p>
           </div>
         )}

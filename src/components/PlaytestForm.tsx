@@ -1,412 +1,482 @@
 // src/components/PlaytestForm.tsx (or your actual path)
 
-import React, { useState, useEffect } from 'react'; // Import useEffect
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form"; // Import Controller
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
-import { toast } from "sonner";
-import FileUpload from './FileUpload';
-import SuccessScreen from './SuccessScreen';
+import React, { useState, useMemo } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { v4 as uuidv4 } from 'uuid';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import FileUpload from '@/components/FileUpload';
+import { countries } from '@/lib/countries';
+import { 
+    saveSubmissionToDynamoDB,
+    createGameLiftApplication, 
+} from '@/services/supabase';
+import { Progress } from '@/components/ui/progress';
+import { Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-// --- CHANGE POINT 1: Update the import ---
-// Import the NEW AWS service functions including the email function
-import { uploadGameBuildToS3, saveSubmissionToDynamoDB, sendConfirmationEmail } from '@/services/supabase';
-
-// --- CHANGE POINT 1: Update the Form Schema using discriminatedUnion ---
+// -- Start Schema Refactor --
 const baseSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  country: z.string().min(1, { message: "Please select your country" }), // Use min(1) for required string
+  email: z.string().email({ message: "Invalid email address" }),
+  country: z.string().min(1, { message: "Country is required" }),
+  submissionType: z.enum(['upload', 'url']),
 });
 
-const formSchema = z.discriminatedUnion("submissionType", [
-  // Schema when submissionType is 'upload'
-  baseSchema.extend({
-    submissionType: z.literal('upload'),
-    gameFile: z.instanceof(File, { message: "Please upload your game build file." }),
-    gameUrl: z.string().optional(), // Keep optional if needed, but not required here
+const uploadSchema = baseSchema.extend({
+  submissionType: z.literal('upload'),
+  // Use simplified refine check for gameFile within this specific schema part
+  gameFile: z.any().refine(files => !!files, { 
+    message: "A game build folder is required for upload submissions",
   }),
-  // Schema when submissionType is 'url'
-  baseSchema.extend({
-    submissionType: z.literal('url'),
-    gameUrl: z.string().url({ message: "Please enter a valid URL." }),
-    gameFile: z.any().optional(), // Keep optional if needed, but not required here
-  }),
-], {
-    // Error message if neither schema matches (e.g., invalid submissionType)
-    errorMap: (issue, ctx) => {
-        if (issue.code === "invalid_union_discriminator") {
-            return { message: "Invalid submission type selected." };
-        }
-        // Use default error message for other issues
-        return { message: ctx.defaultError };
-    }
+  gameUrl: z.string().optional(), // Keep optional here, won't be validated
 });
 
+const urlSchema = baseSchema.extend({
+  submissionType: z.literal('url'),
+  gameFile: z.any().optional(), // Keep optional here, won't be validated
+  // Require non-empty URL for url submissions
+  gameUrl: z.string().url({ message: "Invalid URL" }).min(1, { message: "Game URL is required for URL submissions" }),
+});
 
-type FormValues = z.infer<typeof formSchema>;
+// Use discriminatedUnion based on submissionType
+const playtestSchema = z.discriminatedUnion("submissionType", [
+  uploadSchema,
+  urlSchema
+]);
+// -- End Schema Refactor --
 
-// Comprehensive list of countries for dropdown (remains the same)
-const countries = [
-    "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia",
-    // ... (keep the full list) ...
-    "Zambia", "Zimbabwe"
-].sort();
+/* 
+// Old Schema:
+const playtestSchema = z.object({
+  email: z.string().email({ message: "Invalid email address" }),
+  country: z.string().min(1, { message: "Country is required" }),
+  submissionType: z.enum(['upload', 'url']),
+  gameFile: z.any().optional(), 
+  gameUrl: z.string().url({ message: "Invalid URL" }).optional(),
+}).refine(data => {
+    if (data.submissionType === 'upload') {
+      return !!data.gameFile;
+    } 
+    return true;
+  }, {
+    message: "A game build folder is required for upload submissions",
+    path: ["gameFile"],
+  })
+  .refine(data => data.submissionType === 'url' ? !!data.gameUrl : true, {
+    message: "Game URL is required for URL submissions",
+    path: ["gameUrl"], 
+  });
+*/
 
+type PlaytestFormData = z.infer<typeof playtestSchema>;
 
-const PlaytestForm = () => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0); // Keep for upload simulation
-  const [submissionType, setSubmissionType] = useState<'upload' | 'url'>('upload'); // State for tabs
+// --- Get API Gateway URLs from environment ---
+const presignedUrlApiEndpoint = import.meta.env.VITE_PRESIGNED_URL_API;
+const provisioningApiEndpoint = import.meta.env.VITE_PROVISIONING_API_ENDPOINT;
 
-  // --- CHANGE POINT 2: Update Form Initialization ---
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    // Default values should match one of the union types
+if (!presignedUrlApiEndpoint) {
+    console.error("VITE_PRESIGNED_URL_API environment variable is not set! Uploads will fail.");
+    // Consider adding UI feedback here
+}
+if (!provisioningApiEndpoint) {
+    console.error("VITE_PROVISIONING_API_ENDPOINT environment variable is not set! Provisioning trigger will fail.");
+}
+
+const PlaytestForm: React.FC = () => {
+  const {
+    register,
+    handleSubmit,
+    watch,
+    control,
+    formState: { errors, isValid },
+    reset,
+  } = useForm<PlaytestFormData>({
+    resolver: zodResolver(playtestSchema),
+    mode: 'onChange',
     defaultValues: {
-      email: "",
-      country: "",
-      submissionType: 'upload', // Default to upload
-      gameFile: undefined, // Will be validated by the 'upload' schema part
-      gameUrl: "",         // Will be validated by the 'url' schema part
+      email: '',
+      country: '',
+      submissionType: 'upload',
+      gameFile: null,
+      gameUrl: '',
     },
-    mode: "onChange", // Trigger validation more frequently for better UX/debugging
   });
 
-  // --- Add useEffect to log form state changes ---
-  useEffect(() => {
-    const subscription = form.watch((value, { name, type }) => {
-      console.log("Form value changed:", name, type, value);
-      console.log("Current form errors:", form.formState.errors);
-      console.log("Is form valid?:", form.formState.isValid);
-    });
-    return () => subscription.unsubscribe();
-  }, [form]);
-  // --- End of useEffect ---
+  const navigate = useNavigate();
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [fileProgress, setFileProgress] = useState<{ [key: string]: { loaded: number, total: number } }>({});
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
 
-  // --- CHANGE POINT 3: Update File/URL Handling ---
-  // File selection handler
-  const onFileSelect = (file: File | null) => { // Allow null for clearing
-    console.log("onFileSelect called with:", file); // <-- Add log
-    form.setValue("gameFile", file || undefined, { shouldValidate: true });
-    console.log("form.setValue for gameFile executed. Checking form state shortly after..."); // <-- Add log
-    // Log the value right after setting it (might be slightly delayed due to async nature of state updates)
-    setTimeout(() => {
-        console.log("Form value for gameFile (delayed check):", form.getValues("gameFile"));
-    }, 100);
-    if (file) {
-      form.setValue("gameUrl", "", { shouldValidate: false }); // Clear URL if file is selected
-    }
+  const submissionType = watch('submissionType');
+  const gameFileValue = watch('gameFile');
+
+  // Calculate overall progress
+   const overallProgress = useMemo(() => {
+        const files = Object.values(fileProgress);
+        if (files.length === 0) return 0;
+        const totalSize = files.reduce((sum, file) => sum + (file.total || 0), 0);
+        const totalLoaded = files.reduce((sum, file) => sum + (file.loaded || 0), 0);
+        return totalSize > 0 ? Math.round((totalLoaded / totalSize) * 100) : 0;
+    }, [fileProgress]);
+
+  // --- NEW: Function to get Presigned URL ---
+  const getPresignedUrl = async (objectKey: string, contentType: string): Promise<string> => {
+      if (!presignedUrlApiEndpoint) {
+           throw new Error("API endpoint for presigned URL is not configured.");
+      }
+      console.log(`Requesting presigned URL for key: ${objectKey}, type: ${contentType}`);
+      const response = await fetch(presignedUrlApiEndpoint, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ objectKey, contentType }),
+      });
+
+      if (!response.ok) {
+          const errorBody = await response.json().catch(() => ({}));
+          console.error("Error response from presigned URL API:", response.status, errorBody);
+          throw new Error(`Failed to get presigned URL: ${response.statusText} - ${errorBody.details || 'Unknown error'}`);
+      }
+
+      const data = await response.json();
+      if (!data.presignedUrl) {
+           console.error("Presigned URL missing from API response:", data);
+          throw new Error("Presigned URL was not returned from the API.");
+      }
+      console.log(`Received presigned URL successfully for ${objectKey}`);
+      return data.presignedUrl;
   };
 
-  // URL change handler
-  const onUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    form.setValue("gameUrl", e.target.value, { shouldValidate: true });
-    if (e.target.value) {
-      form.setValue("gameFile", undefined, { shouldValidate: false }); // Clear file if URL is entered
-      // Potentially reset FileUpload component state if it holds internal state
-    }
+  // --- NEW: Function to upload a single file using fetch ---
+  const uploadFileWithPresignedUrl = async (file: File, targetS3Key: string) => {
+       try {
+           const presignedUrl = await getPresignedUrl(targetS3Key, file.type || 'application/octet-stream');
+
+           setStatusMessage(`Uploading: ${file.webkitRelativePath || file.name}`);
+           setFileProgress(prev => ({ ...prev, [targetS3Key]: { loaded: 0, total: file.size } }));
+
+           await new Promise<void>((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.open('PUT', presignedUrl, true);
+              xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+              xhr.upload.onprogress = (event) => {
+                  if (event.lengthComputable) {
+                      // console.log(`Upload Progress (${targetS3Key}): ${Math.round((event.loaded / event.total) * 100)}%`);
+                      setFileProgress(prev => ({
+                          ...prev,
+                          [targetS3Key]: { loaded: event.loaded, total: event.total }
+                      }));
+                  }
+              };
+
+              xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                      console.log(`Successfully uploaded ${targetS3Key}`);
+                      // Final update to ensure 100% for this file
+                       setFileProgress(prev => ({
+                           ...prev,
+                           [targetS3Key]: { loaded: file.size, total: file.size }
+                       }));
+                      resolve();
+                  } else {
+                       console.error(`Upload failed for ${targetS3Key}: ${xhr.status} ${xhr.statusText}`, xhr.responseText);
+                       reject(new Error(`Upload failed for ${file.webkitRelativePath || file.name}: ${xhr.status} ${xhr.statusText}`));
+                  }
+              };
+
+              xhr.onerror = () => {
+                  console.error(`Network error during upload for ${targetS3Key}`);
+                   setFileProgress(prev => ({ ...prev, [targetS3Key]: { loaded: -1, total: file.size } })); // Indicate error
+                  reject(new Error('Network error during upload.'));
+              };
+
+              xhr.send(file);
+           });
+
+       } catch (error) {
+          console.error(`Error during upload process for ${targetS3Key}:`, error);
+           setStatusMessage(`Failed to upload ${file.webkitRelativePath || file.name}.`);
+            setFileProgress(prev => ({ ...prev, [targetS3Key]: { loaded: -1, total: file.size } })); // Indicate error
+           throw error; // Re-throw to stop onSubmit
+       }
   };
 
-  // --- CHANGE POINT 4: Update onSubmit Logic ---
-  const onSubmit = async (data: FormValues) => {
-    console.log("onSubmit triggered!"); // <-- Add this log
-    console.log("Form data received:", data); // <-- Add this log
-
-    setIsSubmitting(true);
+  const onSubmit = async (data: PlaytestFormData) => {
+    console.log('onSubmit triggered!');
+    console.log('Form data received:', data);
+    setIsLoading(true);
+    setSubmissionError(null);
+    setStatusMessage('Preparing submission...');
     setUploadProgress(0);
-
-    // Zod schema refinement handles the core validation now
-    // Let's log the validation result explicitly for debugging
-    const validation = formSchema.safeParse(data);
-    console.log("Zod validation result:", validation); // <-- Add this log
+    setFileProgress({});
 
     try {
-      let s3Bucket: string | undefined = undefined;
-      let s3Key: string | undefined = undefined;
-      let fileName: string | undefined = undefined;
-      let gameBuildUrl: string | undefined = undefined;
+      console.log('Zod validation passed.');
 
-      // --- Step 1: Handle Upload or URL ---
-      // Manual check is no longer needed as discriminatedUnion handles it
+      const submissionId = uuidv4();
+      let gameBuildS3UriPrefix = '';
+      let originalFileName = '';
+      let executablePath = '';
+
       if (data.submissionType === 'upload') {
-        // data.gameFile is guaranteed to be a File here by the schema
-        console.log("Processing file upload for:", data.gameFile.name);
+        if (!(data.gameFile instanceof FileList && data.gameFile.length > 0)) {
+          throw new Error("Invalid or empty game build folder selected.");
+        }
+        
+        const files = data.gameFile as FileList;
+        const firstFilePath = files[0].webkitRelativePath;
+        const rootFolderName = firstFilePath.split('/')[0] || `game-build-${submissionId}`;
+        originalFileName = rootFolderName;
+        gameBuildS3UriPrefix = `s3://${import.meta.env.VITE_S3_BUCKET_NAME}/game-builds/${submissionId}/`;
+        executablePath = `${rootFolderName}/MyProject.exe`;
 
-        // Simulate upload progress
-        const progressInterval = setInterval(() => {
-          setUploadProgress(prev => {
-            const newProgress = prev + Math.random() * 10;
-            return newProgress > 90 ? 90 : newProgress; // Cap simulation
-          });
-        }, 500);
+        console.log(`Processing ${files.length} files from folder: ${rootFolderName}`);
+        setStatusMessage(`Preparing to upload ${files.length} files...`);
 
-        console.log('Uploading to S3...');
-        const uploadResult = await uploadGameBuildToS3(data.gameFile, data.email);
-        console.log('S3 Upload Result:', uploadResult);
+        const uploadPromises: Promise<void>[] = [];
+        const validFilesToUpload: File[] = [];
 
-        clearInterval(progressInterval); // Stop simulation after upload
-        setUploadProgress(100); // Mark as complete
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const relativePath = file.webkitRelativePath;
 
-        s3Bucket = uploadResult.s3Bucket;
-        s3Key = uploadResult.s3Key;
-        fileName = uploadResult.fileName;
+          if ((file.size === 0 && relativePath.endsWith('/')) || relativePath.startsWith('__MACOSX/')) {
+             console.log(` -> Skipping: ${relativePath}`);
+             continue; 
+          }
+          validFilesToUpload.push(file);
 
-      } else if (data.submissionType === 'url') {
-        // data.gameUrl is guaranteed to be a valid URL string here by the schema
-        console.log('Using provided URL:', data.gameUrl);
-        gameBuildUrl = data.gameUrl;
-        // No S3 upload, no progress simulation needed for URL
-        setUploadProgress(100); // Indicate processing complete immediately
-      }
-      // No 'else' needed as the discriminated union ensures one case matches if valid
+          const targetS3Key = `game-builds/${submissionId}/${relativePath}`;
+          console.log(` -> Queuing upload for: ${relativePath} to ${targetS3Key}`);
 
-      // --- Step 2: Save submission data to AWS DynamoDB ---
-      // NOTE: saveSubmissionToDynamoDB now handles optional S3/URL details
-      console.log('Saving submission to DynamoDB...');
-      const dbResult = await saveSubmissionToDynamoDB(
-        data.email,
-        data.country,
-        s3Bucket,
-        s3Key,
-        fileName,
-        gameBuildUrl
-      );
-      console.log('DynamoDB Save Result:', dbResult);
+          uploadPromises.push(
+            uploadFileWithPresignedUrl(file, targetS3Key)
+          );
+        }
 
-      // --- Step 3: Send Confirmation Email ---
-      if (dbResult.success && dbResult.submissionId) {
-        console.log('Sending confirmation email...');
-        await sendConfirmationEmail(
-          data.email, // Recipient
-          dbResult.submissionId, // Submission ID from DB result
-          data.submissionType, // 'upload' or 'url'
-          { fileName: fileName, gameBuildUrl: gameBuildUrl } // Pass relevant details
-        );
-        console.log('Confirmation email call completed.');
+        if (uploadPromises.length === 0) {
+          throw new Error("No valid files found in the selected folder to upload.");
+        }
+
+        console.log(`Starting upload of ${uploadPromises.length} files...`);
+        setStatusMessage(`Uploading ${uploadPromises.length} files...`);
+        await Promise.all(uploadPromises);
+
+        setStatusMessage('Upload complete! Saving submission...');
+        console.log('Finished uploading all files.');
+        console.log('All files uploaded successfully!');
+      } else if (data.submissionType === 'url' && data.gameUrl) {
+        originalFileName = data.gameUrl;
+        setStatusMessage('Processing URL submission...');
       } else {
-         console.warn('Skipping confirmation email due to DynamoDB save issue or missing submission ID.');
+        throw new Error('Invalid submission state.');
       }
 
+      // Determine s3Uri or gameUrl based on submissionType
+      let submissionData: any = {
+        submissionId,
+        email: data.email,
+        country: data.country,
+        submissionType: data.submissionType,
+        status: 'UPLOADED', // Initial status
+        createdAt: new Date().toISOString(),
+      };
 
-      toast.success("Game build submitted successfully!");
-      setIsSuccess(true);
+      if (data.submissionType === 'upload') {
+          submissionData.s3BuildUri = gameBuildS3UriPrefix;
+          submissionData.originalFileName = originalFileName;
+      } else { // submissionType === 'url'
+          // submissionData.gameUrl = data.gameUrl;
+          setStatusMessage('Processing URL submission...');
+          console.log('Processing URL submission.');
+      }
+
+      // --- Save initial submission data to DB (Using original signature) --- 
+      setStatusMessage('Saving submission details...');
+      console.log('Saving initial submission data with ID:', submissionId);
+      const dynamoResult = await saveSubmissionToDynamoDB(
+        submissionId, 
+        data.email, 
+        data.country,
+        originalFileName,
+        data.submissionType === 'upload' ? gameBuildS3UriPrefix : data.gameUrl,
+        executablePath  // Use the defined executablePath
+      );
+      console.log('Submission save result:', dynamoResult);
+      // Add success/error check if dynamoResult provides it
+      // if (!dynamoResult.success) {
+      //   throw new Error(`Failed to save submission: ${dynamoResult.error}`);
+      // }
+      console.log('Initial submission data saved successfully.');
+
+      // --- Trigger Backend Provisioning --- 
+      if (provisioningApiEndpoint && data.submissionType === 'upload') { // Only trigger for uploads and if configured
+          try {
+              setStatusMessage('Starting game provisioning...'); // Optional status update
+              console.log(`Triggering provisioning for submissionId: ${submissionId}`);
+
+              const provisionResponse = await fetch(provisioningApiEndpoint, {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ submissionId: submissionId }),
+              });
+
+              if (!provisionResponse.ok) {
+                  const errorBody = await provisionResponse.json().catch(() => ({}));
+                  console.error("Error response from provisioning API:", provisionResponse.status, errorBody);
+                  // Decide how critical this is - maybe just warn the user?
+                  setStatusMessage('Upload complete, but provisioning trigger failed. Please contact support.');
+              } else {
+                  const provisionResult = await provisionResponse.json();
+                  console.log("Provisioning triggered successfully:", provisionResult);
+              }
+          } catch (provisionError: any) {
+              console.error("Error calling provisioning API:", provisionError);
+              setStatusMessage('Upload complete, but failed to contact provisioning service. Please contact support.');
+          }
+      } else if (data.submissionType === 'upload'){
+           setStatusMessage('Upload complete, but provisioning endpoint not configured.');
+           console.warn("Provisioning endpoint not configured. Skipping trigger.");
+      }
+
+      // --- Navigate directly to Stream page --- 
+      setStatusMessage('Submission successful! Redirecting to stream page...');
+      console.log(`onSubmit completed successfully. Navigating to /stream/${submissionId}`);
+      reset(); // Reset form after successful submission
+      navigate(`/stream/${submissionId}`); // NEW: Navigate directly to stream page
 
     } catch (error: any) {
-      console.error("Error submitting form:", error);
-      toast.error(`Submission failed: ${error.message || 'Please try again.'}`);
-      setUploadProgress(0); // Reset progress on error
+      console.error('Submission failed:', error);
+      setSubmissionError(`Submission failed: ${error.message}`);
+      setStatusMessage('Submission failed. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
-  // --- CHANGE POINT 5: Update Reset Function ---
-  const resetForm = () => {
-    form.reset({
-      email: "",
-      country: "",
-      submissionType: 'upload', // Reset to default tab
-      gameFile: undefined,
-      gameUrl: ""
-    });
-    setSubmissionType('upload'); // Reset tab state
-    // TODO: Add a way to reset the FileUpload component if it has internal state
-    setIsSuccess(false);
-    setUploadProgress(0);
-  };
-
-  // Success screen rendering (remains the same)
-  if (isSuccess) {
-    return <SuccessScreen email={form.getValues().email} onReset={resetForm} />;
-  }
-
-  // Form rendering (JSX remains largely the same, just ensure field names match schema)
   return (
-    <Card className="cyber-card max-w-md w-full mx-auto" id="playtestform">
-       <CardHeader>
-         <CardTitle className="text-2xl cyber-heading">Submit Your Game</CardTitle>
-         <CardDescription>
-           Fill in the details below to start your game stream testing process
-         </CardDescription>
-       </CardHeader>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-lg mx-auto p-8 bg-cyber-dark shadow-lg rounded-lg border border-cyber-purple/30">
+      <h2 className="text-2xl font-bold text-center text-cyber-neon-blue mb-6">Game Playtest Submission</h2>
 
-       <Form {...form}>
-         {/* Add novalidate to prevent default browser validation interfering with react-hook-form */}
-         <form onSubmit={form.handleSubmit(onSubmit)} noValidate>
-           <CardContent className="space-y-6">
-             {/* Email Field */}
-             <FormField
-               control={form.control}
-               name="email"
-               render={({ field }) => (
-                 <FormItem>
-                   <FormLabel>Email</FormLabel>
-                   <FormControl>
-                     <Input
-                       type="email" // Ensure correct input type
-                       placeholder="your.email@example.com"
-                       className="cyber-input"
-                       {...field}
-                     />
-                   </FormControl>
-                   <FormDescription>
-                     We'll send test results to this email
-                   </FormDescription>
-                   <FormMessage /> {/* Displays Zod validation errors */}
-                 </FormItem>
-               )}
-             />
+      <div>
+        <Label htmlFor="email" className="text-cyber-light">Email Address</Label>
+        <Input id="email" type="email" {...register('email')} className="mt-1 bg-input border-cyber-purple/50 focus:border-cyber-neon-blue" />
+        {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
+      </div>
 
-            {/* Country Field */}
-             <FormField
-               control={form.control}
-               name="country"
-               render={({ field }) => (
-                 <FormItem>
-                   <FormLabel>Region (Country)</FormLabel>
-                   {/* Use Select component correctly with react-hook-form */}
-                   <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                     <FormControl>
-                       <SelectTrigger className="cyber-input">
-                         {/* Display selected value or placeholder */}
-                         <SelectValue placeholder="Select your country" />
-                       </SelectTrigger>
-                     </FormControl>
-                     <SelectContent className="bg-cyber-dark border border-cyber-purple/30 max-h-80">
-                       {countries.map((country) => (
-                         <SelectItem key={country} value={country} className="cyber-select-item">
-                           {country}
-                         </SelectItem>
-                       ))}
-                     </SelectContent>
-                   </Select>
-                   <FormDescription>
-                     Select the region for optimal streaming performance
-                   </FormDescription>
-                   <FormMessage />
-                 </FormItem>
-               )}
-             />
+      <div>
+          <Label htmlFor="country" className="text-cyber-light">Country</Label>
+          <Controller
+            name="country"
+            control={control}
+            rules={{ required: true }}
+            render={({ field }) => (
+              <Select 
+                onValueChange={field.onChange}
+                value={field.value}
+              >
+                <SelectTrigger className="w-full mt-1 bg-input border-cyber-purple/50 focus:border-cyber-neon-blue">
+                  <SelectValue placeholder="Select your country" />
+                </SelectTrigger>
+                <SelectContent className="bg-cyber-dark border-cyber-purple/50 max-h-60">
+                  {countries.map((country) => (
+                    <SelectItem key={country.code} value={country.name} className="hover:bg-cyber-purple/30 focus:bg-cyber-purple/40">
+                      {country.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {errors.country && <p className="text-red-500 text-sm mt-1">{errors.country.message}</p>}
+      </div>
 
-             {/* --- CHANGE POINT 6: Add Tabs for Upload/URL --- */}
-             <FormField
-                control={form.control}
-                name="submissionType" // Control the hidden submissionType value
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Submission Method</FormLabel>
-                    <FormControl>
-                      <Tabs
-                        value={submissionType}
-                        onValueChange={(value) => {
-                          const newType = value as 'upload' | 'url';
-                          setSubmissionType(newType);
-                          field.onChange(newType); // Update react-hook-form state
-                          // Clear the other field when switching tabs
-                          if (newType === 'upload') {
-                            form.setValue('gameUrl', '', { shouldValidate: false });
-                          } else {
-                            form.setValue('gameFile', undefined, { shouldValidate: false });
-                            // TODO: Reset FileUpload component state if needed
-                          }
-                          form.clearErrors(['gameFile', 'gameUrl']); // Clear errors on switch
-                        }}
-                        className="w-full"
-                      >
-                        <TabsList className="grid w-full grid-cols-2">
-                          <TabsTrigger value="upload">Upload File</TabsTrigger>
-                          <TabsTrigger value="url">Provide URL</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="upload" className="mt-4">
-                          {/* File Upload Field (Conditional) */}
-                          <FormField
-                            control={form.control}
-                            name="gameFile"
-                            render={({ fieldState }) => (
-                              <FormItem>
-                                <FormLabel className="sr-only">Game Build File</FormLabel>
-                                <FormControl>
-                                  <FileUpload onFileSelect={onFileSelect} />
-                                </FormControl>
-                                <FormDescription>
-                                  Upload your game build file (.zip, .rar, .7z, .exe, .dmg)
-                                </FormDescription>
-                                <FormMessage>{fieldState.error?.message}</FormMessage>
-                              </FormItem>
-                            )}
-                          />
-                        </TabsContent>
-                        <TabsContent value="url" className="mt-4">
-                          {/* URL Input Field (Conditional) */}
-                          <FormField
-                            control={form.control}
-                            name="gameUrl"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Game Build URL</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    placeholder="https://your-storage-provider.com/build.zip"
-                                    className="cyber-input"
-                                    {...field}
-                                    onChange={(e) => {
-                                        field.onChange(e); // RHF internal update
-                                        onUrlChange(e); // Custom handler to clear file
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormDescription>
-                                  Provide a direct download link (e.g., S3, Google Drive).
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </TabsContent>
-                      </Tabs>
-                    </FormControl>
-                    {/* Removed redundant FormMessage here, errors are handled within field controls */}
-                  </FormItem>
-                )}
-              />
+      <div>
+        <Label htmlFor="submissionType" className="text-cyber-light">Submission Type</Label>
+        <Controller
+          name="submissionType"
+          control={control}
+          render={({ field }) => (
+            <Select 
+              onValueChange={field.onChange} 
+              value={field.value}
+            >
+              <SelectTrigger className="w-full mt-1 bg-input border-cyber-purple/50 focus:border-cyber-neon-blue">
+                <SelectValue placeholder="Select submission type" />
+              </SelectTrigger>
+              <SelectContent className="bg-cyber-dark border-cyber-purple/50">
+                <SelectItem value="upload" className="hover:bg-cyber-purple/30 focus:bg-cyber-purple/40">Upload Game Build Folder</SelectItem>
+                <SelectItem value="url" className="hover:bg-cyber-purple/30 focus:bg-cyber-purple/40">Provide Game Build URL</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </div>
 
+      {submissionType === 'upload' && (
+        <div>
+          <Label htmlFor="gameFile" className="text-cyber-light">Game Build Folder</Label>
+          <Controller
+            name="gameFile"
+            control={control}
+            render={({ field: { onChange, value } }) => {
+              const handleChange = (files: FileList | null) => {
+                console.log('Controller onChange called with:', files);
+                onChange(files);
+              };
+              return (
+                <FileUpload 
+                  onChange={handleChange}
+                  value={value}
+                  className="mt-1" 
+                />
+              );
+            }}
+          />
+          {errors.gameFile && (
+            <p className="text-red-500 text-sm mt-1">{typeof errors.gameFile.message === 'string' ? errors.gameFile.message : 'Invalid input'}</p>
+          )}
+        </div>
+      )}
 
-             {/* Progress Bar - Show only for upload type */}
-             {isSubmitting && submissionType === 'upload' && uploadProgress > 0 && (
-               <div className="w-full pt-4">
-                 <div className="h-2 w-full bg-cyber-dark rounded-full overflow-hidden">
-                   <div
-                     className="h-full bg-cyber-neon-purple transition-all duration-300 ease-out"
-                     style={{ width: `${uploadProgress}%` }}
-                   />
-                 </div>
-                 <p className="text-xs text-right mt-1 text-muted-foreground">
-                   {uploadProgress < 100 ? 'Uploading...' : 'Processing...'}
-                 </p>
-               </div>
-             )}
-           </CardContent>
+      {submissionType === 'url' && (
+        <div>
+          <Label htmlFor="gameUrl" className="text-cyber-light">Game Build URL</Label>
+          <Input id="gameUrl" type="url" {...register('gameUrl')} placeholder="https://..." className="mt-1 bg-input border-cyber-purple/50 focus:border-cyber-neon-blue" />
+          {errors.gameUrl && <p className="text-red-500 text-sm mt-1">{errors.gameUrl.message}</p>}
+        </div>
+      )}
 
-           <CardFooter>
-             <Button
-               type="submit"
-               className="cyber-button w-full"
-               disabled={isSubmitting} // Disable button while submitting
-             >
-               {isSubmitting ? "Submitting..." : "Submit Game Build"}
-             </Button>
-           </CardFooter>
-         </form>
-       </Form>
-     </Card>
+      {isLoading && submissionType === 'upload' && overallProgress > 0 && (
+        <div className="my-4">
+          <p className="text-sm text-muted-foreground mb-1">{statusMessage || 'Uploading...'}</p>
+          <Progress value={overallProgress} className="w-full" />
+        </div>
+      )}
+
+      <Button type="submit" disabled={isLoading /* || !isValid */} className="w-full bg-cyber-neon-blue hover:bg-cyber-neon-purple text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+        {isLoading ? (
+          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Please wait...</>
+        ) : (
+          'Submit Playtest Build'
+        )}
+      </Button>
+
+      {submissionError && !isLoading && (
+        <p className="text-red-500 text-sm mt-4 text-center">{submissionError}</p>
+      )}
+    </form>
   );
 };
 

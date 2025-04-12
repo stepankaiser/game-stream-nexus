@@ -21,5 +21,9 @@ export default defineConfig(({ mode }) => ({
     },
     
   },
-  
+  optimizeDeps: {
+    exclude: [
+      './sample-gameliftstreams-web-application-main'
+    ]
+  },
 }));

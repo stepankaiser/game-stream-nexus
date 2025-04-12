@@ -1,0 +1,16 @@
+{
+  "name": "gameliftsessionpoller",
+  "version": "1.0.0",
+  "description": "Lambda function to poll GameLift stream session status using AWS SDK V2/V3",
+  "main": "index.cjs",
+  "type": "commonjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-gameliftstreams": "^3.631.0",
+    "aws-sdk": "^2.1659.0"
+  }
+} 

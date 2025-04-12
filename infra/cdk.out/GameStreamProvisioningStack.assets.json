@@ -1,0 +1,90 @@
+{
+  "version": "41.0.0",
+  "files": {
+    "5c63316902f6ef2dc47d4ce13958273bb67ddcc78f6c85daaa28697ac16c53bb": {
+      "displayName": "CreateAppFunction/Code",
+      "source": {
+        "path": "asset.5c63316902f6ef2dc47d4ce13958273bb67ddcc78f6c85daaa28697ac16c53bb",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-current_region": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "5c63316902f6ef2dc47d4ce13958273bb67ddcc78f6c85daaa28697ac16c53bb.zip",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    },
+    "ff1769ccff314f4a0367e322df7d3aee56b6bb498497acc7d1e6f6f22841fa44": {
+      "displayName": "AssociateAppFunction/Code",
+      "source": {
+        "path": "asset.ff1769ccff314f4a0367e322df7d3aee56b6bb498497acc7d1e6f6f22841fa44",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-current_region": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "ff1769ccff314f4a0367e322df7d3aee56b6bb498497acc7d1e6f6f22841fa44.zip",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    },
+    "af049858a4cb4434a7f302661b5d3ed0325bf5e2504ced6d40b82d0cd3dd5628": {
+      "displayName": "UpdateDbFunction/Code",
+      "source": {
+        "path": "asset.af049858a4cb4434a7f302661b5d3ed0325bf5e2504ced6d40b82d0cd3dd5628",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-current_region": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "af049858a4cb4434a7f302661b5d3ed0325bf5e2504ced6d40b82d0cd3dd5628.zip",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    },
+    "cb1bacb7ae6b8f3d9cb59a5126f6f2393667770c211e97bde1d90d582c0c8789": {
+      "displayName": "CheckAppStatusFunction/Code",
+      "source": {
+        "path": "asset.cb1bacb7ae6b8f3d9cb59a5126f6f2393667770c211e97bde1d90d582c0c8789",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-current_region": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "cb1bacb7ae6b8f3d9cb59a5126f6f2393667770c211e97bde1d90d582c0c8789.zip",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    },
+    "f971a98c849383ec5a2a5bb375d365b0d7fe5740ca11f5b4d8f20fcada9b514e": {
+      "displayName": "StartStepFunctionLambda/Code",
+      "source": {
+        "path": "asset.f971a98c849383ec5a2a5bb375d365b0d7fe5740ca11f5b4d8f20fcada9b514e",
+        "packaging": "zip"
+      },
+      "destinations": {
+        "current_account-current_region": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "f971a98c849383ec5a2a5bb375d365b0d7fe5740ca11f5b4d8f20fcada9b514e.zip",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    },
+    "34a297d36f4bbace7948d3a19d64fd6209c7c887ff593a56cba52fd0b81309b3": {
+      "displayName": "GameStreamProvisioningStack Template",
+      "source": {
+        "path": "GameStreamProvisioningStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "34a297d36f4bbace7948d3a19d64fd6209c7c887ff593a56cba52fd0b81309b3.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
