@@ -62,6 +62,64 @@ const GameStream = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [inputChannel, setInputChannel] = useState<RTCDataChannel | null>(null);
   
+  // Remove all the initialization and reload related state
+  const INITIAL_POLL_INTERVAL = 1000; // 1 second
+  const MAX_POLL_ATTEMPTS = 30; // 30 seconds max
+  const pollAttemptsRef = useRef(0);
+
+  // Remove the problematic initialization check and refs
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Handle redirect reload once
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasReloaded = searchParams.get('reloaded') === 'true';
+    
+    if (!hasReloaded) {
+      console.log("[Redirect Handler] First load, adding reload parameter...");
+      searchParams.set('reloaded', 'true');
+      const newUrl = `${window.location.pathname}?${searchParams.toString()}`;
+      window.location.href = newUrl;
+    } else {
+      console.log("[Redirect Handler] Already reloaded, proceeding normally");
+      setIsInitialized(true);
+    }
+  }, []);
+
+  // Initialize on mount
+  useEffect(() => {
+    if (!submissionId || !isInitialized) return;
+    
+    console.log("[Init] Initializing GameStream with submissionId:", submissionId);
+    setConnectionStatus('Idle'); // Reset to trigger the polling effect
+  }, [submissionId, isInitialized]);
+
+  // Reset on unmount
+  useEffect(() => {
+    return () => {
+      console.log("[Cleanup] GameStream unmounting - resetting state");
+      setIsInitialized(false);
+      setConnectionStatus('Idle');
+      setSubmissionDetails(null);
+      setSdpOffer(null);
+      setSessionInfo(null);
+      setStreamSessionArn(null);
+      setError(null);
+      
+      // Clear any existing media streams
+      if (videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
+      if (audioRef.current?.srcObject) {
+        const stream = audioRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        audioRef.current.srcObject = null;
+      }
+    };
+  }, []);
+
   // Refs for intervals/timeouts
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -101,100 +159,57 @@ const GameStream = () => {
       };
   }, []);
 
-  // --- Effect: Poll for Submission Details --- 
+  // Replace the redirect/reload effect with a polling mechanism
   useEffect(() => {
-      if (!submissionId || connectionStatus !== 'Idle') {
-          console.log("[PollEffect] Skipping: No submissionId or not in Idle state.");
-          return;
+    if (!submissionId) return;
+
+    const pollForDetails = async () => {
+      console.log(`[Initial Poll] Attempt ${pollAttemptsRef.current + 1} of ${MAX_POLL_ATTEMPTS}`);
+      try {
+        const details = await getSubmissionDetails(submissionId);
+        
+        if (details?.applicationArn && details?.streamGroupId && details?.status === 'READY') {
+          console.log('[Initial Poll] Found all required details:', {
+            applicationArn: details.applicationArn,
+            streamGroupId: details.streamGroupId,
+            status: details.status
+          });
+          setSubmissionDetails(details);
+          setConnectionStatus('Idle'); // This will trigger the normal flow
+          return true; // Stop polling
+        } else {
+          console.log('[Initial Poll] Still waiting for details:', details);
+          return false; // Continue polling
+        }
+      } catch (error) {
+        console.error('[Initial Poll] Error fetching details:', error);
+        return false; // Continue polling
       }
+    };
 
-      console.log(`[PollEffect] Starting polling for submissionId: ${submissionId}`);
-      setConnectionStatus('FetchingDetails');
-      setStatusMessage('Checking submission status...');
+    const pollInterval = setInterval(async () => {
+      pollAttemptsRef.current++;
+      
+      const success = await pollForDetails();
+      
+      if (success || pollAttemptsRef.current >= MAX_POLL_ATTEMPTS) {
+        clearInterval(pollInterval);
+        if (!success && pollAttemptsRef.current >= MAX_POLL_ATTEMPTS) {
+          console.error('[Initial Poll] Max attempts reached without success');
+          setError('Failed to load submission details. Please refresh the page.');
+          setStatusMessage('Failed to load submission details.');
+          setConnectionStatus('Error');
+        }
+      }
+    }, INITIAL_POLL_INTERVAL);
 
-      const pollStartTime = Date.now();
+    // Initial check immediately
+    pollForDetails();
 
-      const poll = async () => {
-          if (!submissionId) return; // Guard against race condition on unmount
-          console.log(`[PollEffect] Polling DynamoDB for ${submissionId}...`);
-          try {
-              const details: SubmissionDetails | null = await getSubmissionDetails(submissionId);
-              console.log("[PollEffect] Fetched details:", details);
-
-              if (details) {
-                  setSubmissionDetails(details); // Update state with latest details
-
-                  // Check for completion or error
-                  if (details.status === 'READY' && details.applicationArn && details.streamGroupId) {
-                      console.log("[PollEffect] Status is READY and ARN/Group ID found. Stopping poll.");
-                      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
-                      setConnectionStatus('DetailsReady'); // Move to next state
-                      setStatusMessage('Submission ready. Initializing stream...');
-                  } else if (details.status?.toLowerCase().startsWith('error')) {
-                      console.error(`[PollEffect] Submission entered error state: ${details.status}`);
-                      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
-                      setError(`Provisioning failed: ${details.status}. Please contact support.`);
-                      setStatusMessage(`Provisioning failed: ${details.status}.`);
-                      setConnectionStatus('Error');
-                  } else {
-                      // Continue polling - update status message
-                      setStatusMessage(`Provisioning status: ${details.status || 'Unknown'}. Waiting...`);
-                  }
-              } else {
-                  // Item not found yet, continue polling
-                  console.log("[PollEffect] Submission details not found yet.");
-                  setStatusMessage('Waiting for submission record...');
-              }
-          } catch (err: any) {
-              console.error("[PollEffect] Error during polling:", err);
-              // Optionally stop polling on error or just log and continue
-              // setError(`Error fetching submission details: ${err.message}`);
-              // setConnectionStatus('Error');
-              // if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-              // if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
-          }
-
-          // Check for timeout
-          if (Date.now() - pollStartTime > POLLING_TIMEOUT_MS) {
-              console.error("[PollEffect] Polling timed out.");
-              if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-              setError('Timed out waiting for submission to become ready. Please contact support.');
-              setStatusMessage('Timed out waiting for submission status.');
-              setConnectionStatus('Error');
-          }
-      };
-
-      // Initial poll immediately, then set interval
-      poll(); 
-      pollIntervalRef.current = setInterval(poll, POLLING_INTERVAL_MS);
-
-      // Set overall timeout
-      pollTimeoutRef.current = setTimeout(() => {
-           console.error("[PollEffect] Polling Timeout Reached (via setTimeout).");
-           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-           
-           // Check current status using setter callback form
-           setConnectionStatus(currentStatus => {
-               if (currentStatus === 'DetailsReady') {
-                   setError('Timed out waiting for submission to become ready. Please contact support.');
-                   setStatusMessage('Timed out waiting for submission status.');
-                   return 'Error'; // Update status to Error
-               }
-               return currentStatus; // Otherwise, keep the current status
-           });
-
-      }, POLLING_TIMEOUT_MS);
-
-      // Cleanup function for this effect
-      return () => {
-          console.log("[PollEffect] Cleanup: Clearing submission polling interval/timeout.");
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-          if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
-      };
-
-  }, [submissionId, connectionStatus]); // Rerun if submissionId changes or if status resets to Idle
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [submissionId]);
 
   // --- Effect: Initialize SDK & Generate Offer --- 
   useEffect(() => {
@@ -216,10 +231,10 @@ const GameStream = () => {
                   autoGamepad: true,
                   autoKeyboard: true,
                   autoMouse: true,
-                  autoPointerLock: true,
+                  autoPointerLock: false,
                   setCursor: true,
                   trackWindowFocus: true,
-                  resetOnDetach: true,
+                  resetOnDetach: false,
                   keyboardConfiguration: {
                       enabled: true,
                       autoCapture: true,
@@ -231,8 +246,8 @@ const GameStream = () => {
                       preventDefaults: true,
                       pointerLockConfig: {
                           enabled: true,
-                          autoRequest: true,
-                          autoRelease: true
+                          autoRequest: false,
+                          autoRelease: false
                       }
                   }
               },
@@ -283,30 +298,18 @@ const GameStream = () => {
   };
 
   const handleConnectionStateChange = (state: string) => {
+    console.log("[Connection] State changed to:", state);
     if (state === 'connected') {
         setConnectionStatus('Connected');
         setStatusMessage('Stream connected successfully!');
-        
-        // Attach input when connection is established
-        if (gameliftSdkInstance) {
-            try {
-                console.log("[Connection] Attaching input...");
-                gameliftSdkInstance.attachInput();
-                console.log("[Connection] Input attached successfully");
-            } catch (err) {
-                console.error("[Connection] Failed to attach input:", err);
-            }
-        }
     } else if (state === 'connecting') {
         setConnectionStatus('StartingSession');
         setStatusMessage('Connection establishing...');
     } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
-        // Only update if we're not already in an error state
         if (connectionStatus !== 'Error') {
             setConnectionStatus('Disconnected');
             setStatusMessage('Stream disconnected.');
             
-            // Detach input and clear media streams
             if (gameliftSdkInstance) {
                 try {
                     gameliftSdkInstance.detachInput();
@@ -629,20 +632,59 @@ const GameStream = () => {
     video.tabIndex = 0;
     video.style.outline = 'none';
 
-    // Focus video on mount and click
-    video.focus();
-    video.addEventListener('click', () => {
-        video.focus();
-        video.requestPointerLock();
-        console.log("[Input] Video focused and pointer lock requested");
-    });
+    let isInputAttached = false;
+
+    // Handle pointer lock changes
+    const handlePointerLockChange = () => {
+        if (document.pointerLockElement === video) {
+            console.log("[Input] Pointer lock acquired");
+            if (!isInputAttached) {
+                try {
+                    gameliftSdkInstance.attachInput();
+                    isInputAttached = true;
+                    console.log("[Input] Input attached to SDK");
+                } catch (err) {
+                    console.error("[Input] Failed to attach input:", err);
+                }
+            }
+        } else {
+            console.log("[Input] Pointer lock released");
+            if (isInputAttached) {
+                try {
+                    gameliftSdkInstance.detachInput();
+                    isInputAttached = false;
+                    console.log("[Input] Input detached from SDK");
+                } catch (err) {
+                    console.error("[Input] Failed to detach input:", err);
+                }
+            }
+        }
+    };
+
+    // Handle click events for pointer lock
+    const handleVideoClick = () => {
+        if (!document.pointerLockElement) {
+            video.focus();
+            try {
+                video.requestPointerLock();
+                console.log("[Input] Requesting pointer lock");
+            } catch (err) {
+                console.error("[Input] Failed to request pointer lock:", err);
+            }
+        }
+    };
 
     // Handle fullscreen changes
     const handleFullscreenChange = () => {
         if (document.fullscreenElement === video) {
             console.log("[Input] Video entered fullscreen");
-            video.focus();
-            video.requestPointerLock();
+            if (!document.pointerLockElement) {
+                try {
+                    video.requestPointerLock();
+                } catch (err) {
+                    console.error("[Input] Failed to request pointer lock on fullscreen:", err);
+                }
+            }
         } else {
             console.log("[Input] Video exited fullscreen");
             if (document.pointerLockElement === video) {
@@ -651,54 +693,37 @@ const GameStream = () => {
         }
     };
 
-    // Handle pointer lock changes
-    const handlePointerLockChange = () => {
-        if (document.pointerLockElement === video) {
-            console.log("[Input] Pointer lock acquired");
-            try {
-                gameliftSdkInstance.attachInput();
-                console.log("[Input] Input attached to SDK");
-            } catch (err) {
-                console.error("[Input] Failed to attach input:", err);
-            }
-        } else {
-            console.log("[Input] Pointer lock released");
-            try {
-                gameliftSdkInstance.detachInput();
-                console.log("[Input] Input detached from SDK");
-            } catch (err) {
-                console.error("[Input] Failed to detach input:", err);
-            }
+    // Handle ESC key to release pointer lock
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && document.pointerLockElement === video) {
+            document.exitPointerLock();
         }
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    video.addEventListener('click', handleVideoClick);
     document.addEventListener('pointerlockchange', handlePointerLockChange);
-
-    // Initial input attachment
-    try {
-        gameliftSdkInstance.attachInput();
-        console.log("[Input] Initial input attachment successful");
-    } catch (err) {
-        console.error("[Input] Failed initial input attachment:", err);
-    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('keydown', handleKeyDown);
 
     // Cleanup
     return () => {
         console.log("[Input] Cleaning up input handlers");
-        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        video.removeEventListener('click', handleVideoClick);
         document.removeEventListener('pointerlockchange', handlePointerLockChange);
+        document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        document.removeEventListener('keydown', handleKeyDown);
         
         if (document.pointerLockElement === video) {
             document.exitPointerLock();
         }
         
-        if (gameliftSdkInstance) {
+        if (isInputAttached && gameliftSdkInstance) {
             try {
                 gameliftSdkInstance.detachInput();
-                console.log("[Input] Input detached");
+                isInputAttached = false;
+                console.log("[Input] Input detached on cleanup");
             } catch (err) {
-                console.error("[Input] Failed to detach input:", err);
+                console.error("[Input] Failed to detach input on cleanup:", err);
             }
         }
     };
